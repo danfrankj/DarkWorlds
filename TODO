@@ -3,3 +3,5 @@
 3. compute pointwise "haloness" based on kernel for a particular sky DAN
 4. given a discrete grid of haloness values, determine location of halos;
 	maybe smooth the grid of haloness values. ALEX
+5. Maybe we should create a gradient ascent search where we base the gradient
+        ascent on our haloness function
