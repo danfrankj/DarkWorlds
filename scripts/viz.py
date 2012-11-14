@@ -1,22 +1,8 @@
 import numpy as np
-import pylab
-import sys
-import os
-import inspect
 import matplotlib.pyplot as plt
+from skytools import read_sky
 
-def read_sky(skynum):
-    data_dir = os.path.join(os.path.dirname(
-        os.path.abspath(inspect.getfile(inspect.currentframe()))), '../data/Train_Skies/')
-    
-    return np.loadtxt(
-        os.path.join(data_dir, skyfile_name(skynum)), delimiter=',', 
-        unpack=True, usecols=(1,2,3,4), skiprows=1).T;
-        
-def skyfile_name(skynum):
-    return 'Training_Sky' + str(skynum) + '.csv'
-
-def plot_sky(skynum):    
+def plot_sky(skynum, dm_x=None, dm_y=None):    
     # load in all halos for now...
     # how to not use 2 file reads?
     n_halos = np.loadtxt('../data/Training_halos.csv',\
@@ -29,13 +15,12 @@ def plot_sky(skynum):
             
     gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
     n_gal = gal_x.size
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
+    ax = plt.figure().add_subplot(1,1,1)
     ax.patch.set_facecolor('black')
     ax.set_title('Training Sky ' + str(skynum) + ': ' +\
-                   str(n_gal) + ' galaxies, ' + str(n_halos[skynum-1]) +\
+                  str(n_gal) + ' galaxies, ' + str(n_halos[skynum-1]) +\
                    ' halos')
-        
+    
     margin = 100
     ax.axis((min(gal_x)-margin, max(gal_x)+margin, min(gal_y)-margin, max(gal_y)+margin))
         
@@ -47,7 +32,7 @@ def plot_sky(skynum):
     '''
     ellipticity definition is still slightly mysterious
     the definition (taken from the forums) of,
-    \theta = \frac{1}{2} atan(e_2/e_1)
+    \theta = \frac{1}{2} atan(e_2,e_1)
     has the right behavoir i.e,
     e_2 = 0, e_1 > 0 \implies \theta = 0
     e_1 = 0, e_2 > 0 \implies \theta = pi/4
@@ -79,4 +64,21 @@ def plot_sky(skynum):
         
 
     plt.show();
+
+'''
+mysky = Sky(1)
+
+class Sky(object):
+    val = 1
+    array = None
+
+    def __init__(skynum):
+        self.array = read_sky(skynum)
+
+    def dostuff():
+        return val
+
+    def get_elipticiies():
+'''
+    
 
