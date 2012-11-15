@@ -14,8 +14,9 @@ def read_halos(skynum):
     halo_coords = np.loadtxt(halo_path,\
                              delimiter=',', unpack=True,\
                              usecols=range(4,10),skiprows=1).T
-    
-    return(n_halos[skynum], halo_coords[skynum, :])
+
+    # skies are one indexed!
+    return(n_halos[skynum-1], halo_coords[skynum-1, :])
 
 def read_sky(skynum):
     data_dir = os.path.join(os.path.dirname(
