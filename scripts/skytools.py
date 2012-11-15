@@ -3,6 +3,19 @@ import sys
 import os
 import inspect
 
+def read_halos(skynum):
+    halo_path = os.path.join(os.path.dirname(
+        os.path.abspath(inspect.getfile(inspect.currentframe()))), '../data/Training_halos.csv')
+    
+    n_halos = np.loadtxt(halo_path,\
+                                delimiter=',', unpack=True,\
+                                usecols=(1,), dtype=int, skiprows=1)
+    # don't have any use for x_ref, y_ref for now, so skip..
+    halo_coords = np.loadtxt(halo_path,\
+                             delimiter=',', unpack=True,\
+                             usecols=range(4,10),skiprows=1).T
+    
+    return(n_halos[skynum], halo_coords[skynum, :])
 
 def read_sky(skynum):
     data_dir = os.path.join(os.path.dirname(
@@ -14,4 +27,6 @@ def read_sky(skynum):
         
 def skyfile_name(skynum):
     return 'Training_Sky' + str(skynum) + '.csv'
+
+
 
