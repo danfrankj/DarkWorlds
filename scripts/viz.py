@@ -18,12 +18,19 @@ def plot_haloness(skynum):
     Z = np.zeros(X.shape)
     
     # looping is NOT the right thing to do...
-    ofor idx, x in enumerate(xplot):
+    for idx, x in enumerate(xplot):
         for idy, y in enumerate(yplot):
             Z[idy, idx] = haloness(x, y, mysky)
-            
-    plt.contourf(X, Y, Z)
     
+    plt.contourf(X, Y, Z)
+    plt.hold(True);
+    
+    n_halos, halo_coords = read_halos(skynum)
+    for ihalo in range(n_halos):
+        plt.scatter(halo_coords[ihalo*2], halo_coords[ihalo*2 + 1],\
+                        color='white', s=100)
+        
+    plt.axis((min(gal_x)-margin, max(gal_x)+margin, min(gal_y)-margin, max(gal_y)+margin))
     plt.show()
     
 
