@@ -1,6 +1,6 @@
-
 import numpy as np
 from scipy import optimize
+from haloness import haloness
 
 def finitediff(f, eps):
     """
@@ -23,7 +23,7 @@ def finitediff(f, eps):
     """
     def g(x, *args, **kwds):
         f0 = f(x, *args, **kwds)
-        grad = numpylib.nans(x.shape)
+        grad = np.empty(x.shape) * np.nan
         perturbation = np.empty(x.shape)
         for i in range(len(x)):
             perturbation.fill(0.)
@@ -39,11 +39,26 @@ def minimize_bfgs(f, x0, fprime=None, **kwargs):
     """
     return scipy.optimize.fmin_bfgs(f, x0, fprime=fprime, **kwargs)
     
-def minimize_gdescent(f, x0, fprime, gtol=1e-5, maxiter=10000, alpha=.001, retall=True):
+def minimize_gdescent(f, x0, fprime, gtol=1e-5, maxiter=100, alpha=1., 
+                        retall=True):
+    path = []
     x = x0
     for i in xrange(maxiter):
+        print i
+        if retall:
+            path.append(x)
         g = fprime(x)
         x = x - alpha * g
         if np.linalg.norm(g) < gtol:
             break
-    return x, f(x), fprime(x), i == (maxiter - 1)
+    return x, f(x), fprime(x), i == (maxiter - 1), path
+
+def optimize_sky(sky, **kwargs):
+    
+    def opt_func(dm_xy):
+        return haloness(dm_x=dm_xy[0], dm_y=dm_xy[1], sky=sky)
+    grad = finitediff(opt_func, eps=10.)
+    x0 = np.mean(sky, axis=0)[:2]
+    return minimize_gdescent(f = opt_func, x0=x0, fprime=grad, **kwargs)
+
+
