@@ -1,15 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from skytools import read_sky, read_halos
-from haloness import haloness
+from haloness import *
 
-def plot_haloness(skynum):
+def plot_haloness(skynum, kernel=gaussian(1000.), N=200.):
     mysky = read_sky(skynum)
     # I hope these just point to mysky...
     # this is where a class might be useful
     gal_x,gal_y,gal_e1,gal_e2 = mysky.T
     
-    N = 200
     margin = 100
     xplot = np.linspace(min(gal_x)-margin, max(gal_x)+margin, N)
     yplot = np.linspace(min(gal_y)-margin, max(gal_y)+margin, N)
@@ -20,9 +19,11 @@ def plot_haloness(skynum):
     # looping is NOT the right thing to do...
     for idx, x in enumerate(xplot):
         for idy, y in enumerate(yplot):
-            Z[idy, idx] = haloness(x, y, mysky)
+            Z[idy, idx] = haloness(x, y, mysky, kernel)
     
-    plt.contourf(X, Y, Z)
+    #plt.contourf(X, Y, Z)
+    plt.pcolor(X, Y, Z)
+    plt.colorbar()
     plt.hold(True);
     
     n_halos, halo_coords = read_halos(skynum)
@@ -31,6 +32,7 @@ def plot_haloness(skynum):
                         color='white', s=100)
         
     plt.axis((min(gal_x)-margin, max(gal_x)+margin, min(gal_y)-margin, max(gal_y)+margin))
+    
     plt.show()
     
 
