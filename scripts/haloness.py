@@ -12,7 +12,6 @@ def gaussian(bw=1000.):
     return mykernel
 
 def haloness(dm_x, dm_y, sky, kernel):
-    
     gal_x,gal_y,gal_e1,gal_e2 = sky.T
     dist = np.sqrt(np.power(gal_x - dm_x, 2) + np.power(gal_y - dm_y, 2))
     weight = kernel(dist)
