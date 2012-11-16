@@ -9,7 +9,7 @@ def plot_haloness(skynum):
     # this is where a class might be useful
     gal_x,gal_y,gal_e1,gal_e2 = mysky.T
     
-    N = 50
+    N = 200
     margin = 100
     xplot = np.linspace(min(gal_x)-margin, max(gal_x)+margin, N)
     yplot = np.linspace(min(gal_y)-margin, max(gal_y)+margin, N)
