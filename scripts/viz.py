@@ -29,7 +29,7 @@ def plot_haloness(skynum, kernel=gaussian(1000.), N=200.):
     n_halos, halo_coords = read_halos(skynum)
     for ihalo in range(n_halos):
         plt.scatter(halo_coords[ihalo*2], halo_coords[ihalo*2 + 1],\
-                        color='white', s=100)
+                        color='white', s=50)
         
     plt.axis((min(gal_x)-margin, max(gal_x)+margin, min(gal_y)-margin, max(gal_y)+margin))
     
