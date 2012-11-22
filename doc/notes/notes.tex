@@ -1,0 +1,51 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+
+\renewcommand{\i}{^{(i)}}
+\newcommand{\norm}[1]{\left|\left|#1\right|\right|} 
+\newcommand{\argmin}{\mathrm{argmin}}
+\newcommand{\argmax}{\mathrm{argmax}}
+
+\begin{document}
+Our approach so far has been to define a ``weighting'' or ``kernel'' $K_{\theta}(r)$ that describes the fall-off of halo influence with distance $r$, parameterized by $\theta$. We then define a ``haloness'' score,
+\begin{equation*}
+H(x,y) = \frac{\sum_{i=1}^{N_G} K_{\theta}(r\i) e_t\i(x,y)}{\sum_{i=1}^{N_G} K_{\theta} (r\i)}
+\end{equation*}
+where $N_G$ is the number of galaxies in the given sky, $r_i = \norm{(x - x\i, y - y\i)}$ is the distance to galaxy $i$, $e_t\i(x,y) = -e_1\i \cos(2\phi\i) - e_2\i \sin(2\phi\i)$ is the tangential component of the galaxy's ellipticity, and $\phi\i = \arctan \left(\frac{y - y\i}{x - x\i} \right)$.
+Our predicited halo location is then given simply by,
+\begin{equation*}
+(x^*, y^*) = \underset{(x,y)}{\argmax} \ H(x,y)
+\end{equation*}
+The question is how to extend this haloness metric to multiple halos. This doesn't seem obvious.
+
+Another approach is to predict a galaxy's ellipicity based on a given halo location and then choose a halo location that agrees best with observed ellipicity. The simplest model is to assume that ellipicity is composed of a tangential component and a zero-mean stochastic term. The predicited ellipticities for galaxy $i$ are then given by,
+\begin{align*}
+\hat{e}_1\i(x,y) & = - K_{\theta}(r\i) \cos(2\phi\i) + \epsilon_1\i \\
+\hat{e}_2\i(x,y) & = - K_{\theta}(r\i) \sin(2\phi\i) + \epsilon_2\i
+\end{align*}
+{\it The problem with this approach is that $\norm{(e_1,e_2)}^2 \leq 1$  - i.e. the distribution on $\epsilon$ should account for this fact}.
+Assuming Gaussian $\epsilon$ with a diagonal covariance leads to minimizing the squared error,
+\begin{align*}
+E(x,y) & = \sum_{i=1}^{N_G} \left[ e_1\i + K_{\theta}(r\i) \cos(2\phi\i) \right]^2 + \left[ e_2\i + K_{\theta}(r\i) \sin(2\phi\i) \right]^2 \\
+(x^*, y^*) & = \underset{(x,y)}\argmin \ E(x,y)
+\end{align*}
+Expanding the error we obtain,
+\begin{align*} 
+E(x,y) & = \sum_i ({e_1\i}^2 + {e_2\i}^2) + K_{\theta}(r\i)^2 + 2 K_{\theta} \left[ e_1\i \cos(2\phi\i) + e_2\i \sin(2\phi\i) \right] \\
+\ & = \sum_i ({e_1\i}^2 + {e_2\i}^2) + K_{\theta}(r\i)^2 - 2 K_{\theta}(r\i) e_t\i(x,y) \\
+\ & \equiv \sum_i \frac{1}{2} K_{\theta}(r\i)^2 - K_{\theta}(r\i) e_t\i(x,y) 
+\end{align*}
+Note that the observed ellipticity term is indepdent of $(x,y)$ and can be neglected. {\it This is very similar to the halo scoring - I suspect it is identical.}
+
+The ellipticity model is naturally extensible to multiple halos,
+\begin{align*}
+\hat{e}_1\i(\left\{(x,y)\right\},\left\{\alpha\right\}) & = -\sum_{j} \alpha_j K_{\theta}(r\i_j) \cos(2\phi\i_j) + \epsilon_1\i \\
+\hat{e}_2\i(\left\{(x,y)\right\},\left\{\alpha\right\}) & = -\sum_{j} \alpha_j K_{\theta}(r\i_j) \sin(2\phi\i_j) + \epsilon_2\i 
+\end{align*}
+where the sum is over a set of candidate halo locations and $\alpha_j > 0$ is the relative halo strength parameter.
+\end{document}
+
+
+
