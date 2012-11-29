@@ -81,7 +81,6 @@ class OptimizationException(Exception):
 
 
 def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
-    # halo_coords is stacked coordinates - dm_x first, then dm_y
     nhalo = dm_x.size
     ngal = gal_x.size
 
@@ -112,7 +111,7 @@ def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
     if np.min(alpha_star) <= 0.0:
         raise OptimizationException()
 
-    return  -alpha_star * weights * np.cos(2 * phis), -alpha_star * weights * np.sin(2 * phis)
+    return -alpha_star * weights * np.cos(2 * phis), -alpha_star * weights * np.sin(2 * phis)
 
 
 def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
@@ -122,6 +121,7 @@ def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
 
 def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False):
 
+    # halo_coords is stacked coordinates - dm_x first, then dm_y
     nhalo, halo_coords = skytools.read_halos(skynum)
     sky = skytools.read_sky(skynum)
     gal_x, gal_y, gal_e1, gal_e2 = sky.T
@@ -139,8 +139,7 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False):
 
         return elipticity_error(gal_e1, gal_e2, model_e1, model_e2)
 
-    grid_range = [(0, 4200) for i in range(halo_coords.size / 2)]
-
+    grid_range = [(0, 4200)] * nhalo * 2
     sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid, finish=None)
 
     print sol
