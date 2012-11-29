@@ -73,20 +73,19 @@ def optimize_sky(sky, **kwargs):
 brute force optimization of ellipticity error function...
 '''
 
-def error(sky, kernel):
+def error(skynum, kernel):
     
     def f(halo_coords):
+
         # halo_coords is stacked coordinates - dm_x first, then dm_y
         nhalo = halo_coords.size/2
         dm_x = halo_coords[0:nhalo]
         dm_y = halo_coords[nhalo:2*nhalo]
         
+        sky = read_sky(skynum)
         gal_x,gal_y,gal_e1,gal_e2 = sky.T
         ngal = gal_x.size
         
-        e1_hat = np.zeros(ngal)
-        e2_hat = np.zeros([ngal, nhalo])
-    
         # compute weights and angles
         weights = np.zeros([ngal, nhalo]) 
         phis    = np.zeros([ngal, nhalo]) 
@@ -125,7 +124,7 @@ def error(sky, kernel):
         
 
 
-def predict(skynum, kernel=gaussian(1000.), Ngrid=20):
+def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False):
     
     nhalo, halo_coords = read_halos(skynum)
     sky = read_sky(skynum)
@@ -133,14 +132,13 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=20):
     grid_range = (0, 4200)*2*nhalo
     grid_range = [grid_range[i:i+2] for i in range(0, len(grid_range), 2)]
     
-    f = error(sky, kernel)
-    sol, val, grid, Jout = scipy.optimize.brute(f, grid_range, Ns=Ngrid, finish=None, full_output=True)
-    val = error(sky, kernel)(sol)
-    
-    print sol, val
+    sol = scipy.optimize.brute(error(skynum, kernel), grid_range, Ns=Ngrid, finish=None)
+        
+    print sol
     dm_x = sol[0:nhalo]
     dm_y = sol[nhalo:2*nhalo]
     
-    plot_sky(skynum, dm_x, dm_y)
+    if (plot==True):
+        plot_sky(skynum, dm_x, dm_y)
     
-    return grid, Jout, f
+    return 
