@@ -1,8 +1,7 @@
+import scipy
+import skytools
+from haloness import haloness, gaussian
 import numpy as np
-from scipy import optimize
-import numpy.linalg
-# probably verboten, but namespace is tiny for this project...
-from haloness import *
 from viz import plot_sky
 
 
@@ -37,14 +36,16 @@ def finitediff(f, eps):
         return grad
     return g
 
+
 def minimize_bfgs(f, x0, fprime=None, **kwargs):
     """
     a wrapper around bfgs
     """
     return scipy.optimize.fmin_bfgs(f, x0, fprime=fprime, retall=True, **kwargs)
-    
-def minimize_gdescent(f, x0, fprime, gtol=1e-5, maxiter=10000, alpha=1000., 
-                        retall=True):
+
+
+def minimize_gdescent(f, x0, fprime, gtol=1e-5, maxiter=10000, alpha=1000.,
+                      retall=True):
     path = []
     x = x0
     for i in xrange(maxiter):
@@ -58,87 +59,95 @@ def minimize_gdescent(f, x0, fprime, gtol=1e-5, maxiter=10000, alpha=1000.,
             break
     return x, f(x), fprime(x), i == (maxiter - 1), path
 
+
 def optimize_sky(sky, **kwargs):
-    
+
     def opt_func(dm_xy):
         return -1. * haloness(dm_x=dm_xy[0], dm_y=dm_xy[1], sky=sky)
     grad = finitediff(opt_func, eps=1.)
     x0 = np.mean(sky, axis=0)[:2]
     x0 = np.array([1000., 2500.])
     #return minimize_bfgs(opt_func, x0)#, epsilon=1.0)
-    return minimize_gdescent(f = opt_func, x0=x0, fprime=grad, **kwargs)
+    return minimize_gdescent(f=opt_func, x0=x0, fprime=grad, **kwargs)
 
 
 '''
 brute force optimization of ellipticity error function...
 '''
 
-def error(skynum, kernel):
-    
-    def f(halo_coords):
 
-        # halo_coords is stacked coordinates - dm_x first, then dm_y
-        nhalo = halo_coords.size/2
-        dm_x = halo_coords[0:nhalo]
-        dm_y = halo_coords[nhalo:2*nhalo]
-        
-        sky = read_sky(skynum)
-        gal_x,gal_y,gal_e1,gal_e2 = sky.T
-        ngal = gal_x.size
-        
-        # compute weights and angles
-        weights = np.zeros([ngal, nhalo]) 
-        phis    = np.zeros([ngal, nhalo]) 
-        for ihalo in range(nhalo):
-            weights[:,ihalo] = kernel(np.sqrt(np.power(gal_x - dm_x[ihalo], 2) + 
-                                              np.power(gal_y - dm_y[ihalo], 2)))
-            phis[:,ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
-            
-        # solve analytically for strengths
-        b = np.zeros(nhalo)
-        A = np.zeros([nhalo, nhalo])
-        for ihalo in range(nhalo):
-            e_tang = -(gal_e1 * np.cos(2.*phis[:,ihalo]) + 
-                       gal_e2 * np.sin(2.*phis[:,ihalo]))
-            b[ihalo] = np.sum(weights[:,ihalo]*e_tang)
-            for jhalo in range(nhalo):
-                A[ihalo, jhalo] = np.sum(weights[:,ihalo]*weights[:,jhalo]*
-                                         np.cos(2*(phis[:,ihalo]-phis[:,jhalo])))
-        
-        if (np.linalg.cond(A) > 1e9):
-            return 1e20
-        alpha_star = np.linalg.solve(A,b)
-        #print alpha_star
-        # negative strengths are not allowed
-        if (np.min(alpha_star) <= 0.0):
-            return 1e20
-        
-        # compute error 
-        for ihalo in range(nhalo):
-            gal_e1 += alpha_star[ihalo]*weights[:,ihalo]*np.cos(2*phis[:,ihalo])
-            gal_e2 += alpha_star[ihalo]*weights[:,ihalo]*np.sin(2*phis[:,ihalo])
-                        
-        return np.sum(gal_e1**2 + gal_e2**2)
+class OptimizationException(Exception):
+    pass
 
-    return f
-        
+
+def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
+    # halo_coords is stacked coordinates - dm_x first, then dm_y
+    nhalo = dm_x.size
+    ngal = gal_x.size
+
+    # compute weights and angles
+    weights = np.zeros([ngal, nhalo])
+    phis = np.zeros([ngal, nhalo])
+    for ihalo in range(nhalo):
+        weights[:, ihalo] = kernel(np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
+                                           np.power(gal_y - dm_y[ihalo], 2)))
+        phis[:, ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
+
+    # solve analytically for strengths
+    b = np.zeros(nhalo)
+    A = np.zeros([nhalo, nhalo])
+    for ihalo in range(nhalo):
+        e_tang = -(gal_e1 * np.cos(2. * phis[:, ihalo]) +
+                   gal_e2 * np.sin(2. * phis[:, ihalo]))
+        b[ihalo] = np.sum(weights[:, ihalo] * e_tang)
+        for jhalo in range(nhalo):
+            A[ihalo, jhalo] = np.sum(weights[:, ihalo] * weights[:, jhalo] *
+                                     np.cos(2 * (phis[:, ihalo] - phis[:, jhalo])))
+
+    if np.linalg.cond(A) > 1e9:
+        raise OptimizationException()
+    alpha_star = np.linalg.solve(A, b)
+    #print alpha_star
+    # negative strengths are not allowed
+    if np.min(alpha_star) <= 0.0:
+        raise OptimizationException()
+
+    return  -alpha_star * weights * np.cos(2 * phis), -alpha_star * weights * np.sin(2 * phis)
+
+
+def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
+    return np.sum(np.power(gal_e1 - np.sum(model_e1, axis=1), 2) +
+                  np.power(gal_e2 - np.sum(model_e2, axis=1), 2))
 
 
 def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False):
-    
-    nhalo, halo_coords = read_halos(skynum)
-    sky = read_sky(skynum)
-    
-    grid_range = (0, 4200)*2*nhalo
-    grid_range = [grid_range[i:i+2] for i in range(0, len(grid_range), 2)]
-    
-    sol = scipy.optimize.brute(error(skynum, kernel), grid_range, Ns=Ngrid, finish=None)
-        
+
+    nhalo, halo_coords = skytools.read_halos(skynum)
+    sky = skytools.read_sky(skynum)
+    gal_x, gal_y, gal_e1, gal_e2 = sky.T
+
+    def f(halo_coords):
+        dm_x = halo_coords[0:nhalo]
+        dm_y = halo_coords[nhalo: 2 * nhalo]
+        try:
+            model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
+                                                  gal_x=gal_x, gal_y=gal_y,
+                                                  gal_e1=gal_e1, gal_e2=gal_e2,
+                                                  kernel=gaussian(1000.))
+        except OptimizationException:
+            return 1e20
+
+        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2)
+
+    grid_range = [(0, 4200) for i in range(halo_coords.size / 2)]
+
+    sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid, finish=None)
+
     print sol
-    dm_x = sol[0:nhalo]
-    dm_y = sol[nhalo:2*nhalo]
-    
-    if (plot==True):
+    dm_x = sol[0: nhalo]
+    dm_y = sol[nhalo: 2 * nhalo]
+
+    if plot:
         plot_sky(skynum, dm_x, dm_y)
-    
-    return 
+
+    return
