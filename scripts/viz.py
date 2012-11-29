@@ -54,18 +54,8 @@ def plot_sky(skynum, dm_x=None, dm_y=None):
     # plot galaxy centers
     ax.scatter(gal_x, gal_y, s=5, color='white')
     plt.hold(True);
-        
+    
     # plot ellipticity
-    '''
-    ellipticity definition is still slightly mysterious
-    the definition (taken from the forums) of,
-    \theta = \frac{1}{2} atan(e_2,e_1)
-    has the right behavoir i.e,
-    e_2 = 0, e_1 > 0 \implies \theta = 0
-    e_1 = 0, e_2 > 0 \implies \theta = pi/4
-    e_2 = 0, e_1 < 0 \implies \theta = pi/2
-    etc.
-    '''
     scale = 200.0; # scaling factor for ellipticity
     for igal in xrange(n_gal):
         assert(gal_e1[igal] > -1.0 and gal_e1[igal] < 1.0)
@@ -88,9 +78,27 @@ def plot_sky(skynum, dm_x=None, dm_y=None):
         for ii in range(1,10):
             ax.scatter(halo_coords[ihalo*2], halo_coords[ihalo*2 + 1],\
                                  color='white', alpha=0.5-ii/20.0, s=ii*50)
+            
+    # plot predicted halo locations, if given
+    if ((dm_x != None) | (dm_y != None)):
+        assert ((dm_x != None) & (dm_y != None))
+        assert ((n_halos == dm_x.size) & (n_halos == dm_y.size)) 
         
+        plt.scatter(dm_x, dm_y, color="red", s=50)    
 
     plt.show();
+
+
+'''
+ellipticity definition is still slightly mysterious
+the definition (taken from the forums) of,
+\theta = \frac{1}{2} atan(e_2,e_1)
+has the right behavoir i.e,
+e_2 = 0, e_1 > 0 \implies \theta = 0
+e_1 = 0, e_2 > 0 \implies \theta = pi/4
+e_2 = 0, e_1 < 0 \implies \theta = pi/2
+etc.
+'''
 
 
 '''

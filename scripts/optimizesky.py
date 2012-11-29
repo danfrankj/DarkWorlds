@@ -1,6 +1,10 @@
 import numpy as np
 from scipy import optimize
-import haloness
+import numpy.linalg
+# probably verboten, but namespace is tiny for this project...
+from haloness import *
+from viz import plot_sky
+
 
 def finitediff(f, eps):
     """
@@ -57,7 +61,7 @@ def minimize_gdescent(f, x0, fprime, gtol=1e-5, maxiter=10000, alpha=1000.,
 def optimize_sky(sky, **kwargs):
     
     def opt_func(dm_xy):
-        return -1. * haloness.haloness(dm_x=dm_xy[0], dm_y=dm_xy[1], sky=sky)
+        return -1. * haloness(dm_x=dm_xy[0], dm_y=dm_xy[1], sky=sky)
     grad = finitediff(opt_func, eps=1.)
     x0 = np.mean(sky, axis=0)[:2]
     x0 = np.array([1000., 2500.])
@@ -65,3 +69,78 @@ def optimize_sky(sky, **kwargs):
     return minimize_gdescent(f = opt_func, x0=x0, fprime=grad, **kwargs)
 
 
+'''
+brute force optimization of ellipticity error function...
+'''
+
+def error(sky, kernel):
+    
+    def f(halo_coords):
+        # halo_coords is stacked coordinates - dm_x first, then dm_y
+        nhalo = halo_coords.size/2
+        dm_x = halo_coords[0:nhalo]
+        dm_y = halo_coords[nhalo:2*nhalo]
+        
+        gal_x,gal_y,gal_e1,gal_e2 = sky.T
+        ngal = gal_x.size
+        
+        e1_hat = np.zeros(ngal)
+        e2_hat = np.zeros([ngal, nhalo])
+    
+        # compute weights and angles
+        weights = np.zeros([ngal, nhalo]) 
+        phis    = np.zeros([ngal, nhalo]) 
+        for ihalo in range(nhalo):
+            weights[:,ihalo] = kernel(np.sqrt(np.power(gal_x - dm_x[ihalo], 2) + 
+                                              np.power(gal_y - dm_y[ihalo], 2)))
+            phis[:,ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
+            
+        # solve analytically for weights
+        b = np.zeros(nhalo)
+        A = np.zeros([nhalo, nhalo])
+        for ihalo in range(nhalo):
+            e_tang = -(gal_e1 * np.cos(2.*phis[:,ihalo]) + 
+                       gal_e2 * np.sin(2.*phis[:,ihalo]))
+            b[ihalo] = np.sum(weights[:,ihalo]*e_tang)
+            for jhalo in range(nhalo):
+                A[ihalo, jhalo] = np.sum(weights[:,ihalo]*weights[:,jhalo]*
+                                         np.cos(2*(phis[:,ihalo]-phis[:,jhalo])))
+        
+        if (np.linalg.cond(A) > 1e9):
+            return 1e20
+        alpha_star = np.linalg.solve(A,b)
+        #print alpha_star
+        # negative strengths are not allowed
+        if (np.min(alpha_star) <= 0.0):
+            return 1e20
+        
+        # compute error 
+        for ihalo in range(nhalo):
+            gal_e1 += alpha_star[ihalo]*weights[:,ihalo]*np.cos(2*phis[:,ihalo])
+            gal_e2 += alpha_star[ihalo]*weights[:,ihalo]*np.sin(2*phis[:,ihalo])
+                        
+        return np.sum(gal_e1**2 + gal_e2**2)
+
+    return f
+        
+
+
+def predict(skynum, kernel=gaussian(1000.), Ngrid=20):
+    
+    nhalo, halo_coords = read_halos(skynum)
+    sky = read_sky(skynum)
+    
+    grid_range = (0, 4200)*2*nhalo
+    grid_range = [grid_range[i:i+2] for i in range(0, len(grid_range), 2)]
+    
+    f = error(sky, kernel)
+    sol, val, grid, Jout = scipy.optimize.brute(f, grid_range, Ns=Ngrid, finish=None, full_output=True)
+    val = error(sky, kernel)(sol)
+    
+    print sol, val
+    dm_x = sol[0:nhalo]
+    dm_y = sol[nhalo:2*nhalo]
+    
+    plot_sky(skynum, dm_x, dm_y)
+    
+    return grid, Jout, f

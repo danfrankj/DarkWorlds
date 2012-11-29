@@ -15,7 +15,7 @@ def read_halos(skynum):
                              delimiter=',', unpack=True,\
                              usecols=range(4,10),skiprows=1).T
 
-    # skies are one indexed!
+    # skies are one-indexed!
     return(n_halos[skynum-1], halo_coords[skynum-1, :])
 
 def read_sky(skynum):

@@ -22,29 +22,37 @@ The question is how to extend this haloness metric to multiple halos. This doesn
 
 Another approach is to predict a galaxy's ellipicity based on a given halo location and then choose a halo location that agrees best with observed ellipicity. The simplest model is to assume that ellipicity is composed of a tangential component and a zero-mean stochastic term. The predicited ellipticities for galaxy $i$ are then given by,
 \begin{align*}
-\hat{e}_1\i(x,y) & = - K_{\theta}(r\i) \cos(2\phi\i) + \epsilon_1\i \\
-\hat{e}_2\i(x,y) & = - K_{\theta}(r\i) \sin(2\phi\i) + \epsilon_2\i
+\hat{e}_1\i(x,y,\alpha) & = - \alpha K_{\theta}(r\i) \cos(2\phi\i) + \epsilon_1\i \\
+\hat{e}_2\i(x,y.\alpha) & = - \alpha K_{\theta}(r\i) \sin(2\phi\i) + \epsilon_2\i
 \end{align*}
-{\it The problem with this approach is that $\norm{(e_1,e_2)}^2 \leq 1$  - i.e. the distribution on $\epsilon$ should account for this fact}.
+where $\alpha$ is the ``strength'' of the halo. {\it One problem with this approach is that the constraint $\norm{(e_1,e_2)}^2 \leq 1$ is not accounted for}.
 Assuming Gaussian $\epsilon$ with a diagonal covariance leads to minimizing the squared error,
 \begin{align*}
-E(x,y) & = \sum_{i=1}^{N_G} \left[ e_1\i + K_{\theta}(r\i) \cos(2\phi\i) \right]^2 + \left[ e_2\i + K_{\theta}(r\i) \sin(2\phi\i) \right]^2 \\
-(x^*, y^*) & = \underset{(x,y)}\argmin \ E(x,y)
+E(x,y) & = \sum_{i=1}^{N_G} \left[ e_1\i + \alpha K_{\theta}(r\i) \cos(2\phi\i) \right]^2 + \left[ e_2\i + \alpha K_{\theta}(r\i) \sin(2\phi\i) \right]^2 \\
+(x^*, y^*, \alpha^*) & = \underset{(x,y,\alpha)}\argmin \ E(x,y,\alpha)
 \end{align*}
 Expanding the error we obtain,
 \begin{align*} 
-E(x,y) & = \sum_i ({e_1\i}^2 + {e_2\i}^2) + K_{\theta}(r\i)^2 + 2 K_{\theta} \left[ e_1\i \cos(2\phi\i) + e_2\i \sin(2\phi\i) \right] \\
-\ & = \sum_i ({e_1\i}^2 + {e_2\i}^2) + K_{\theta}(r\i)^2 - 2 K_{\theta}(r\i) e_t\i(x,y) \\
-\ & \equiv \sum_i \frac{1}{2} K_{\theta}(r\i)^2 - K_{\theta}(r\i) e_t\i(x,y) 
+E(x,y,\alpha) & = \sum_i ({e_1\i}^2 + {e_2\i}^2) + \alpha^2 K_{\theta}(r\i)^2 + 2 \alpha K_{\theta} \left[ e_1\i \cos(2\phi\i) + e_2\i \sin(2\phi\i) \right] \\
+\ & = \sum_i ({e_1\i}^2 + {e_2\i}^2) + \alpha^2 K_{\theta}(r\i)^2 - 2 \alpha K_{\theta}(r\i) e_t\i(x,y) \\
+\ & \equiv \sum_i \alpha^2 K_{\theta}(r\i)^2 - 2 \alpha K_{\theta}(r\i) e_t\i(x,y)
 \end{align*}
-Note that the observed ellipticity term is indepdent of $(x,y)$ and can be neglected. {\it This is very similar to the halo scoring - I suspect it is identical.}
-
+We can then explicitly solve for $\alpha^*$ because it is quadratic in the objective, 
+\begin{align*}
+\frac{\partial E(x,y,\alpha^*)}{\partial \alpha} = 0 \implies \\ 
+\alpha^* = \frac{\sum_i K_{\theta}(r\i) e_t\i(x,y)}{\sum_i K_{\theta}(r\i)^2}
+\end{align*}
+Substituting,
+\begin{align*}
+E(x,y) & = - \alpha^* \sum_i K_{\theta}(r\i) e_t\i(x,y) \\
+\ & = - \frac{(\sum_i K_{\theta}(r\i) e_t\i(x,y))^2}{\sum_i K_{\theta}(r\i)^2}
+\end{align*}
 The ellipticity model is naturally extensible to multiple halos,
 \begin{align*}
 \hat{e}_1\i(\left\{(x,y)\right\},\left\{\alpha\right\}) & = -\sum_{j} \alpha_j K_{\theta}(r\i_j) \cos(2\phi\i_j) + \epsilon_1\i \\
 \hat{e}_2\i(\left\{(x,y)\right\},\left\{\alpha\right\}) & = -\sum_{j} \alpha_j K_{\theta}(r\i_j) \sin(2\phi\i_j) + \epsilon_2\i 
 \end{align*}
-where the sum is over a set of candidate halo locations and $\alpha_j > 0$ is the relative halo strength parameter.
+where the sum is over a set of candidate halo locations.
 \end{document}
 
 
