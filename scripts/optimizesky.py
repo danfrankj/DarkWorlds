@@ -95,7 +95,7 @@ def error(sky, kernel):
                                               np.power(gal_y - dm_y[ihalo], 2)))
             phis[:,ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
             
-        # solve analytically for weights
+        # solve analytically for strengths
         b = np.zeros(nhalo)
         A = np.zeros([nhalo, nhalo])
         for ihalo in range(nhalo):
