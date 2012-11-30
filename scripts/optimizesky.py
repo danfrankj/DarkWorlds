@@ -3,7 +3,7 @@ import skytools
 from haloness import haloness, gaussian
 import numpy as np
 from viz import plot_sky
-
+import matplotlib.pyplot as plt
 
 def finitediff(f, eps):
     """
@@ -83,7 +83,7 @@ class OptimizationException(Exception):
 def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
     nhalo = dm_x.size
     ngal = gal_x.size
-
+    
     # compute weights and angles
     weights = np.zeros([ngal, nhalo])
     phis = np.zeros([ngal, nhalo])
@@ -91,7 +91,7 @@ def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
         weights[:, ihalo] = kernel(np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
                                            np.power(gal_y - dm_y[ihalo], 2)))
         phis[:, ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
-
+        
     # solve analytically for strengths
     b = np.zeros(nhalo)
     A = np.zeros([nhalo, nhalo])
@@ -118,14 +118,8 @@ def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
     return np.sum(np.power(gal_e1 - np.sum(model_e1, axis=1), 2) +
                   np.power(gal_e2 - np.sum(model_e2, axis=1), 2))
 
-
-def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False, test=False):
-
-    # halo_coords is stacked coordinates - dm_x first, then dm_y
-    nhalo, halo_coords = skytools.read_halos(skynum, test=test)
-    sky = skytools.read_sky(skynum, test=test)
-    gal_x, gal_y, gal_e1, gal_e2 = sky.T
-
+def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel=gaussian(1000.)):
+    
     def f(halo_coords):
         dm_x = halo_coords[0:nhalo]
         dm_y = halo_coords[nhalo: 2 * nhalo]
@@ -139,10 +133,34 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False, test=False):
 
         return elipticity_error(gal_e1, gal_e2, model_e1, model_e2)
 
-    grid_range = [(0, 4200)] * nhalo * 2
-    sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid, finish=None)
+    return f
 
-    print sol
+
+
+
+GRID_SCHEDULE = [100, 20, 7]
+
+def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
+
+    # halo_coords is stacked coordinates - dm_x first, then dm_y
+    nhalo, halo_coords = skytools.read_halos(skynum, test=test)
+
+    if (Ngrid == None):
+        Ngrid = GRID_SCHEDULE[nhalo-1]
+
+    print Ngrid
+
+    sky = skytools.read_sky(skynum, test=test)
+    gal_x, gal_y, gal_e1, gal_e2 = sky.T
+    
+    f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
+                 gal_e1=gal_e1, gal_e2=gal_e2,
+                 nhalo=nhalo)
+    
+    grid_range = [(0, 4200)] * nhalo * 2
+    sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid) #, finish=None)
+    val = f(sol)
+    print sol, val 
     dm_x = sol[0: nhalo]
     dm_y = sol[nhalo: 2 * nhalo]
 
@@ -153,4 +171,43 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False, test=False):
     sol_coords = [0.0] * 3 * 2
     sol_coords[:(nhalo * 2)] = sol
 
-    return sol_coords
+    return sol_coords, sol, val
+
+def diagnostic(skynum, Nrange):
+    nhalo, halo_coords = skytools.read_halos(skynum)
+    
+    sky = skytools.read_sky(skynum)
+    gal_x, gal_y, gal_e1, gal_e2 = sky.T
+    
+    f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
+                 gal_e1=gal_e1, gal_e2=gal_e2,
+                 nhalo=nhalo)
+    
+    val_data = f(halo_coords)
+    print halo_coords, val_data
+    val_array = np.zeros(len(Nrange))
+    for ii in range(len(Nrange)):
+        sol_coords, sol, val = predict(skynum, Ngrid=Nrange[ii])
+        if (val > 1e5):
+            val = -1.0
+        val_array[ii] = val
+        
+    val_max = np.max(val_array)
+    for ii in range(len(Nrange)):
+        if (val_array[ii] < 0.0):
+            val_array[ii] = val_max
+    
+            
+    plt.plot(Nrange, val_array, linewidth=2.5, color='blue', linestyle='-')
+    plt.hold(True)
+    tmprange = np.linspace(min(Nrange), max(Nrange),100)
+    tmpval = val_data*np.ones(100)
+    plt.plot(tmprange, tmpval, linewidth=2.5, color='red', linestyle='--')
+    
+    plt.title('Training Sky ' + str(skynum) + ': '\
+                  + str(nhalo) + ' halos')
+    plt.xlabel('Ngrid')
+    plt.ylabel('f(xstar)')
+
+    plt.show()
+

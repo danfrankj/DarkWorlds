@@ -15,7 +15,7 @@ def read_halos(skynum, test=False):
     if test:
         return n_halos[skynum -1], None
     halo_coords = np.loadtxt(halo_path,
-                             delimiter=',', unpacik=True,
+                             delimiter=',', unpack=True,
                              usecols=range(4, 10), skiprows=1).T
 
     # skies are one-indexed!

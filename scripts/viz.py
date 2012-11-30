@@ -24,7 +24,7 @@ def plot_haloness(skynum, kernel=gaussian(1000.), N=200.):
     #plt.contourf(X, Y, Z)
     plt.pcolor(X, Y, Z)
     plt.colorbar()
-    plt.hold(True);
+    plt.hold(True)
     
     n_halos, halo_coords = read_halos(skynum)
     for ihalo in range(n_halos):
