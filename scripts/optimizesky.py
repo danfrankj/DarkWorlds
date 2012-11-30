@@ -119,11 +119,11 @@ def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
                   np.power(gal_e2 - np.sum(model_e2, axis=1), 2))
 
 
-def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False):
+def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False, test=False):
 
     # halo_coords is stacked coordinates - dm_x first, then dm_y
-    nhalo, halo_coords = skytools.read_halos(skynum)
-    sky = skytools.read_sky(skynum)
+    nhalo, halo_coords = skytools.read_halos(skynum, test=test)
+    sky = skytools.read_sky(skynum, test=test)
     gal_x, gal_y, gal_e1, gal_e2 = sky.T
 
     def f(halo_coords):
@@ -149,4 +149,8 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=20, plot=False):
     if plot:
         plot_sky(skynum, dm_x, dm_y)
 
-    return
+
+    sol_coords = [0.0] * 3 * 2
+    sol_coords[:(nhalo * 2)] = sol
+
+    return sol_coords
