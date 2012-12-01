@@ -118,7 +118,7 @@ def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
     return np.sum(np.power(gal_e1 - np.sum(model_e1, axis=1), 2) +
                   np.power(gal_e2 - np.sum(model_e2, axis=1), 2))
 
-def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel=gaussian(1000.)):
+def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
     
     def f(halo_coords):
         dm_x = halo_coords[0:nhalo]
@@ -127,7 +127,7 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel=gaussian(1000.)):
             model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
                                                   gal_x=gal_x, gal_y=gal_y,
                                                   gal_e1=gal_e1, gal_e2=gal_e2,
-                                                  kernel=gaussian(1000.))
+                                                  kernel=kernel)
         except OptimizationException:
             return 1e20
 
@@ -155,12 +155,12 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
     
     f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
                  gal_e1=gal_e1, gal_e2=gal_e2,
-                 nhalo=nhalo)
+                 nhalo=nhalo, kernel=kernel)
     
     grid_range = [(0, 4200)] * nhalo * 2
     sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid) #, finish=None)
     val = f(sol)
-    print sol, val 
+#    print sol, val 
     dm_x = sol[0: nhalo]
     dm_y = sol[nhalo: 2 * nhalo]
 
@@ -171,7 +171,7 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
     sol_coords = [0.0] * 3 * 2
     sol_coords[:(nhalo * 2)] = sol
 
-    return sol_coords, sol, val
+    return sol_coords, val
 
 def diagnostic(skynum, Nrange):
     nhalo, halo_coords = skytools.read_halos(skynum)
@@ -187,7 +187,7 @@ def diagnostic(skynum, Nrange):
     print halo_coords, val_data
     val_array = np.zeros(len(Nrange))
     for ii in range(len(Nrange)):
-        sol_coords, sol, val = predict(skynum, Ngrid=Nrange[ii])
+        sol_coords, val = predict(skynum, Ngrid=Nrange[ii])
         if (val > 1e5):
             val = -1.0
         val_array[ii] = val

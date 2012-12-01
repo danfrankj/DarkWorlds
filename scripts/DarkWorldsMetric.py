@@ -218,6 +218,7 @@ def main(user_fname, fname):
         
 
     for sky in sky_prediction: #Loop through each line in result.csv and analyse each one
+        print sky
         sky_id = str(sky[0]) #Get the sky_id of the input
         does_it_exist=true_sky_id.count(sky_id) #Is the input sky_id
                                                 #from user a real one?

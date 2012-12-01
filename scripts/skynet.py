@@ -2,13 +2,14 @@
 import optimizesky
 import datetime
 
-TEST_SKIES = range(1, 121)
+SKY_LIST = range(1, 300)
 
-
-def create_submission():
-    with file('submission' + str(datetime.datetime.now()) + '.csv', 'w') as out:
-        for skynum in TEST_SKIES:
-            halo_coords = optimizesky.predict(skynum, test=True)
+def create_submission(test=True):
+    timestamp = str(datetime.datetime.now())
+    with file('submission' + timestamp.replace(' ', '') + '.csv', 'w') as out:
+        for skynum in SKY_LIST:
+            print skynum
+            halo_coords, val = optimizesky.predict(skynum, test=test)
             sky_id = 'Sky' + str(skynum)
             halo_strs = [str(x) for x in halo_coords]
             out.write(sky_id + ',' + ','.join(halo_strs) + "\n")
