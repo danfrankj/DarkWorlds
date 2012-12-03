@@ -3,9 +3,14 @@ import optimizesky
 import datetime
 from haloness import *
 
-SKY_LIST = range(1, 121)
-
+TEST_SKIES = range(1, 121)
+TRAIN_SKIES = range(1, 301)
 def create_submission(test=True):
+    if (test):
+        SKY_LIST = TEST_SKIES
+    else:
+        SKY_LIST = TRAIN_SKIES
+    print SKY_LIST
     timestamp = str(datetime.datetime.now())
     with file('submission' + timestamp.replace(' ', '_').replace(':', '.') + '.csv', 'w') as out:
         for skynum in SKY_LIST:
