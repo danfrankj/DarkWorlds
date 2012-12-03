@@ -5,8 +5,6 @@ from haloness import *
 
 def plot_haloness(skynum, kernel=gaussian(1000.), N=200.):
     mysky = read_sky(skynum)
-    # I hope these just point to mysky...
-    # this is where a class might be useful
     gal_x,gal_y,gal_e1,gal_e2 = mysky.T
     
     margin = 100
@@ -33,6 +31,35 @@ def plot_haloness(skynum, kernel=gaussian(1000.), N=200.):
         
     plt.axis((min(gal_x)-margin, max(gal_x)+margin, min(gal_y)-margin, max(gal_y)+margin))
     
+    plt.show()
+
+def plot_etang(skynum, kernel=gaussian(1000.)):
+    n_halos, halo_coords = read_halos(skynum)
+    gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+
+    assert(n_halos==1)
+    print halo_coords
+    
+    phi = np.arctan((gal_y - halo_coords[1])/(gal_x - halo_coords[0]))
+    e_tang = -(gal_e1 * np.cos(2. * phi) +
+               gal_e2 * np.sin(2. * phi))
+    dist = np.sqrt(np.power(gal_x - halo_coords[0], 2) + 
+                   np.power(gal_y - halo_coords[1], 2))
+    weight = kernel(dist)
+    alpha = np.sum(weight*e_tang)/np.sum(weight*weight)
+    print alpha
+    
+    dist_model = np.linspace(0.0, np.max(dist), 100.0)
+    weight_model = kernel(dist_model)
+    e_tang_model = alpha*weight_model
+    
+    plt.plot(dist, e_tang, '.')
+    plt.hold(True)
+    plt.plot(dist_model, e_tang_model, 'r-', linewidth=1.5)
+    
+    plt.xlabel(r'$r$', fontsize=20)
+    plt.ylabel(r'$e_{\mathrm{tangential}}$', fontsize=20)
+    plt.axis([0.0, np.max(dist)+100.0, -1.0, 1.0])
     plt.show()
     
 
