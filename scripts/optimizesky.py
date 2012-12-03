@@ -130,15 +130,34 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
                                                   kernel=kernel)
         except OptimizationException:
             return 1e20
-
-        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2)
+        
+        # add penalty for leaving domain
+        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2) \
+            - np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0))
 
     return f
 
 
+def fmin_random(f, nhalo, Ns):
+
+    val_min = 1e20
+    sol_min = None
+    for ii in xrange(Ns):
+        x0 = 4200*np.random.rand(2*nhalo)
+        sol = scipy.optimize.fmin(func=f, x0=x0, disp=0)
+        val = f(sol)
+        if (val < val_min):
+            val_min = val
+            sol_min = sol
+        
+    assert(sol_min != None)
+    
+    return sol_min
 
 
-GRID_SCHEDULE = [100, 20, 7]
+
+#GRID_SCHEDULE = [100, 20, 7]
+GRID_SCHEDULE = [201, 201, 201]
 
 def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
 
@@ -158,15 +177,15 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
                  nhalo=nhalo, kernel=kernel)
     
     grid_range = [(0, 4200)] * nhalo * 2
-    sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid) #, finish=None)
+    #sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid) #, finish=None)
+    sol = fmin_random(f=f, nhalo=nhalo, Ns=Ngrid) 
     val = f(sol)
-#    print sol, val 
+    print sol, val 
     dm_x = sol[0: nhalo]
     dm_y = sol[nhalo: 2 * nhalo]
 
     if plot:
         plot_sky(skynum, dm_x, dm_y)
-
 
     sol_coords = [0.0] * 3 * 2
     sol_coords[:(nhalo * 2)] = sol
