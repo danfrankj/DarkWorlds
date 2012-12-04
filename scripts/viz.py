@@ -63,17 +63,22 @@ def plot_etang(skynum, kernel=gaussian(1000.)):
     plt.show()
     
 
-def plot_sky(skynum, dm_x=None, dm_y=None):    
+def plot_sky(skynum, dm_x=None, dm_y=None, test=False):    
     
-    n_halos, halo_coords = read_halos(skynum)
+    n_halos, halo_coords = read_halos(skynum, test=test)
     
-    gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+    gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum, test=test).T
     n_gal = gal_x.size
     ax = plt.figure().add_subplot(1,1,1)
     ax.patch.set_facecolor('black')
-    ax.set_title('Training Sky ' + str(skynum) + ': ' +\
-                  str(n_gal) + ' galaxies, ' + str(n_halos) +\
-                   ' halos')
+    if (test):
+        ax.set_title('Test Sky ' + str(skynum) + ': ' +\
+                         str(n_gal) + ' galaxies, ' + str(n_halos) +\
+                         ' halos')
+    else:
+        ax.set_title('Training Sky ' + str(skynum) + ': ' +\
+                         str(n_gal) + ' galaxies, ' + str(n_halos) +\
+                         ' halos')
     
     margin = 100
     ax.axis((min(gal_x)-margin, max(gal_x)+margin, min(gal_y)-margin, max(gal_y)+margin))
@@ -99,12 +104,13 @@ def plot_sky(skynum, dm_x=None, dm_y=None):
         tmp_coords[1][1] = gal_y[igal] + dy
         ax.plot(tmp_coords[0], tmp_coords[1], color='white')
                 
-    # plot halos
-    for ihalo in range(n_halos):
-        # try to get the blurred effect...
-        for ii in range(1,10):
-            ax.scatter(halo_coords[ihalo*2], halo_coords[ihalo*2 + 1],\
-                                 color='white', alpha=0.5-ii/20.0, s=ii*50)
+    if (test==False):
+        # plot halos        
+        for ihalo in range(n_halos):
+            # try to get the blurred effect...
+            for ii in range(1,10):
+                ax.scatter(halo_coords[ihalo*2], halo_coords[ihalo*2 + 1],\
+                               color='white', alpha=0.5-ii/20.0, s=ii*50)
             
     # plot predicted halo locations, if given
     if ((dm_x != None) | (dm_y != None)):

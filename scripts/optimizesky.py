@@ -156,8 +156,8 @@ def fmin_random(f, nhalo, Ns):
 
 
 
-#GRID_SCHEDULE = [100, 20, 7]
-GRID_SCHEDULE = [201, 201, 201]
+GRID_SCHEDULE = [100, 20, 7]
+#GRID_SCHEDULE = [401, 401, 401]
 
 def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
 
@@ -183,9 +183,9 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
     print sol, val 
     dm_x = sol[0: nhalo]
     dm_y = sol[nhalo: 2 * nhalo]
-
+    print dm_x.size, dm_y.size
     if plot:
-        plot_sky(skynum, dm_x, dm_y)
+        plot_sky(skynum, dm_x, dm_y, test=test)
 
     sol_coords = [0.0] * 3 * 2
     sol_coords[:(nhalo * 2)] = sol
