@@ -1,6 +1,6 @@
 import scipy
 import skytools
-from haloness import haloness, gaussian
+from haloness import haloness, gaussian, distpow
 import numpy as np
 from viz import plot_sky
 import matplotlib.pyplot as plt
@@ -108,8 +108,8 @@ def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
     alpha_star = np.linalg.solve(A, b)
     #print alpha_star
     # negative strengths are not allowed
-    if np.min(alpha_star) <= 0.0:
-        raise OptimizationException()
+    #if np.min(alpha_star) <= 0.0:
+    #    raise OptimizationException()
 
     return -alpha_star * weights * np.cos(2 * phis), -alpha_star * weights * np.sin(2 * phis)
 
@@ -156,8 +156,8 @@ def fmin_random(f, nhalo, Ns):
 
 
 
-GRID_SCHEDULE = [100, 20, 7]
-#GRID_SCHEDULE = [401, 401, 401]
+#GRID_SCHEDULE = [100, 20, 7]
+GRID_SCHEDULE = [100, 300, 500]
 
 def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
 
@@ -192,7 +192,7 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
 
     return sol_coords, val
 
-def diagnostic(skynum, Nrange):
+def diagnostic(skynum, Nrange, kernel=gaussian(1000.)):
     nhalo, halo_coords = skytools.read_halos(skynum)
     
     sky = skytools.read_sky(skynum)
@@ -200,10 +200,11 @@ def diagnostic(skynum, Nrange):
     
     f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
                  gal_e1=gal_e1, gal_e2=gal_e2,
-                 nhalo=nhalo)
+                 nhalo=nhalo, kernel=kernel)
     
     val_data = f(halo_coords)
     print halo_coords, val_data
+    
     val_array = np.zeros(len(Nrange))
     for ii in range(len(Nrange)):
         sol_coords, val = predict(skynum, Ngrid=Nrange[ii])
