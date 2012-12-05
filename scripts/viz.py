@@ -61,6 +61,36 @@ def plot_etang(skynum, kernel=gaussian(1000.)):
     plt.ylabel(r'$e_{\mathrm{tangential}}$', fontsize=20)
     plt.axis([0.0, np.max(dist)+100.0, -1.0, 1.0])
     plt.show()
+
+def plot_etang_train(kernel=gaussian(1000.)):
+    
+    for skynum in range(1, 101):
+        n_halos, halo_coords = read_halos(skynum)
+        gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+
+        assert(n_halos==1)
+        
+        phi = np.arctan((gal_y - halo_coords[1])/(gal_x - halo_coords[0]))
+        e_tang = -(gal_e1 * np.cos(2. * phi) +
+               gal_e2 * np.sin(2. * phi))
+        dist = np.sqrt(np.power(gal_x - halo_coords[0], 2) + 
+                       np.power(gal_y - halo_coords[1], 2))
+        weight = kernel(dist)
+        alpha = np.sum(weight*e_tang)/np.sum(weight*weight)
+        print alpha
+    
+        dist_model = np.linspace(0.0, np.max(dist), 100.0)
+        weight_model = kernel(dist_model)
+        e_tang_model = alpha*weight_model
+    
+        plt.plot(dist, e_tang*(alpha*kernel(0.)), 'k.')
+        plt.hold(True)
+        #plt.plot(dist_model, e_tang_model, 'r-', linewidth=1.5)
+    
+    plt.xlabel(r'$r$', fontsize=20)
+    plt.ylabel(r'$e_{\mathrm{tangential}}$', fontsize=20)
+    plt.axis([0.0, np.max(dist)+100.0, -1.0, 1.0])
+    plt.show()
     
 
 def plot_sky(skynum, dm_x=None, dm_y=None, test=False):    
