@@ -5,7 +5,7 @@ from haloness import *
 TEST_SKIES = range(1, 121)
 TRAIN_SKIES = range(1,301)
 
-def create_submission(test=False, kernel=exppow()): 
+def create_submission(test=False, kernel=exppow_lim()): 
     if (test):
         SKY_LIST = TEST_SKIES
     else:

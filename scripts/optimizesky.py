@@ -43,7 +43,7 @@ def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
     if np.min(alpha_star) <= 0.0:
         raise OptimizationException()
     # eventually we'd like a model where strengths greater than one are not allowed...
-    # alpha_star = np.minimum(alpha_star, 1.0)
+    alpha_star = np.minimum(alpha_star, 1.0)
     
     return -np.sum(alpha_star * weights * np.cos(2 * phis), axis=1), -np.sum(alpha_star * weights * np.sin(2 * phis), axis=1)
 
@@ -89,7 +89,6 @@ def fmin_random(f, nhalo, Ns):
     
     return sol_min
 
-
 GRID_SCHEDULE = [100, 200, 300]
 
 def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False, verbose=True):
@@ -127,17 +126,17 @@ def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False, 
 
 def optimizeparam(Ns=100):
     
-    Nparam = 4
+    Nparam = 2
     val_min = 1e30
     param_min = None
     for ii in xrange(Ns):
         x0 = np.random.rand(Nparam)
         # exponents are (0.0,2.0)
         x0[0] = 2.0*np.random.rand()
-        x0[1] = 2.0*np.random.rand()
+        #x0[1] = 2.0*np.random.rand()
         # coefficients are anyone's guess...
-        x0[2] = 100.0*np.random.rand()
-        x0[3] = 100.0*np.random.rand()
+        x0[1] = 100.0*np.random.rand()
+        #x0[3] = 100.0*np.random.rand()
         
         param = scipy.optimize.fmin(func=kernel_fun, x0=x0, disp=0)
         val = kernel_fun(param)
@@ -151,8 +150,7 @@ def optimizeparam(Ns=100):
 def kernel_fun(param):
     param = np.abs(param)
     def kernel(dist):
-        return np.exp(-np.power(dist/param[2], param[0]) - 
-                       np.power(dist/param[3], param[1]))
+        return np.exp(-np.power(dist/param[1], param[0]))
     error = 0.0
     for skynum in range(1, 101):
         n_halos, halo_coords = read_halos(skynum)
@@ -168,12 +166,12 @@ def kernel_fun(param):
         weight = kernel(dist)
         if (np.sum(weight*weight) > 1e-6):
             alpha = np.sum(weight*e_tang)/np.sum(weight*weight)
+            alpha = np.minimum(alpha, 1.0)
             
-            error += np.sum(np.power(e_tang - alpha*weight, 2))/np.sum(np.power(e_tang,2))
+            error += np.sum(np.power(e_tang - alpha*weight, 2)) #/np.sum(np.power(e_tang,2))
         else:
             error += 1000.0
-            
-    print param, error
+
     return error
 
 

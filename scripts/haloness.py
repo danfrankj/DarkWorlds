@@ -1,15 +1,14 @@
 import numpy as np
 import scipy.stats
 
-def exppow(d=0.4, bw=6.3):
+def exppow(d=0.4, bw=100.0):
     def mykernel(dist):
-        return np.exp(-np.power(dist,d)/bw)
+        return np.exp(-np.power(dist/bw,d))
     return mykernel
 
-def general_exp(param=[0.0, 0.0, 0.0, 0.0]):
+def exppow_lim(d=0.585, bw=409.0):
     def mykernel(dist):
-        return np.exp(-np.power(dist/param[2], param[0]) - 
-                       np.power(dist/param[3], param[1]))
+        return np.exp(-np.power(dist/bw,d))
     return mykernel
 
 def expsqrt(bw = 15.414):
