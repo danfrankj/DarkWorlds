@@ -1,9 +1,188 @@
 import scipy
-import skytools
-from haloness import haloness, gaussian, distpow
+from skytools import *
+from haloness import *
 import numpy as np
-from viz import plot_sky
-import matplotlib.pyplot as plt
+import viz
+
+'''
+from now on, all dark matter coordinates are stored [x1,x2,x3,y1,y2,y3]
+they are only converted from/to [x1,y1,x2,y2,x3,y3] when doing I/O
+'''
+
+class OptimizationException(Exception):
+    pass
+
+def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
+    nhalo = dm_x.size
+    ngal = gal_x.size
+    
+    # compute kernel weights and angles
+    weights = np.zeros([ngal, nhalo])
+    phis = np.zeros([ngal, nhalo])
+    for ihalo in range(nhalo):
+        weights[:, ihalo] = kernel(np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
+                                           np.power(gal_y - dm_y[ihalo], 2)))
+        phis[:, ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
+        
+    # solve analytically for strengths
+    b = np.zeros(nhalo)
+    A = np.zeros([nhalo, nhalo])
+    for ihalo in range(nhalo):
+        e_tang = -(gal_e1 * np.cos(2. * phis[:, ihalo]) +
+                   gal_e2 * np.sin(2. * phis[:, ihalo]))
+        b[ihalo] = np.sum(weights[:, ihalo] * e_tang)
+        for jhalo in range(nhalo):
+            A[ihalo, jhalo] = np.sum(weights[:, ihalo] * weights[:, jhalo] *
+                                     np.cos(2 * (phis[:, ihalo] - phis[:, jhalo])))
+
+    if np.linalg.cond(A) > 1e9:
+        raise OptimizationException()
+    alpha_star = np.linalg.solve(A, b)
+    
+    # negative strengths are not allowed
+    if np.min(alpha_star) <= 0.0:
+        raise OptimizationException()
+    # eventually we'd like a model where strengths greater than one are not allowed...
+    # alpha_star = np.minimum(alpha_star, 1.0)
+    
+    return -np.sum(alpha_star * weights * np.cos(2 * phis), axis=1), -np.sum(alpha_star * weights * np.sin(2 * phis), axis=1)
+
+
+def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
+    return np.sum(np.power(gal_e1 - model_e1, 2) +
+                  np.power(gal_e2 - model_e2, 2))
+
+def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
+    
+    def f(halo_coords):
+        dm_x = halo_coords[0:nhalo]
+        dm_y = halo_coords[nhalo: 2 * nhalo]
+        try:
+            model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
+                                                  gal_x=gal_x, gal_y=gal_y,
+                                                  gal_e1=gal_e1, gal_e2=gal_e2,
+                                                  kernel=kernel)
+        except OptimizationException:
+            return 1e20
+        
+        # add penalty for leaving domain (prevents simplex algo from wandering...)
+        penalty = 10.*(-np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0)))
+        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2) + penalty
+
+    return f
+
+def fmin_random(f, nhalo, Ns):
+
+    val_min = 1e30
+    sol_min = None
+    for ii in xrange(Ns):
+        # produce a random halo configuration in the domain
+        x0 = 4200*np.random.rand(2*nhalo)
+        # hand over to native simplex algorithm
+        sol = scipy.optimize.fmin(func=f, x0=x0, disp=0)
+        val = f(sol)
+        if (val < val_min):
+            val_min = val
+            sol_min = sol
+        
+    assert(sol_min != None)
+    
+    return sol_min
+
+
+GRID_SCHEDULE = [100, 200, 300]
+
+def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False, verbose=True):
+
+    nhalo, halo_coords = read_halos(skynum, test=test)
+    
+    if (Ngrid == None):
+        Ngrid = GRID_SCHEDULE[nhalo-1]
+
+    if (verbose):
+        print "Ngrid: " + str(Ngrid)
+    
+    sky = read_sky(skynum, test=test)
+    gal_x, gal_y, gal_e1, gal_e2 = sky.T
+        
+    f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
+                 gal_e1=gal_e1, gal_e2=gal_e2,
+                 nhalo=nhalo, kernel=kernel)
+    
+    # brute is deprecated in favor of simplex w/random starts...
+    #grid_range = [(0, 4200)] * nhalo * 2
+    #sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid) #, finish=None)
+    
+    sol = fmin_random(f=f, nhalo=nhalo, Ns=Ngrid) 
+    val = f(sol)
+    
+    #print sol, val 
+    dm_x = sol[0: nhalo]
+    dm_y = sol[nhalo: 2 * nhalo]
+    
+    if plot:
+        viz.plot_sky(skynum, dm_x, dm_y, test=test)
+        
+    return dm_x, dm_y, val
+
+def optimizeparam(Ns=100):
+    
+    Nparam = 4
+    val_min = 1e30
+    param_min = None
+    for ii in xrange(Ns):
+        x0 = np.random.rand(Nparam)
+        # exponents are (0.0,2.0)
+        x0[0] = 2.0*np.random.rand()
+        x0[1] = 2.0*np.random.rand()
+        # coefficients are anyone's guess...
+        x0[2] = 100.0*np.random.rand()
+        x0[3] = 100.0*np.random.rand()
+        
+        param = scipy.optimize.fmin(func=kernel_fun, x0=x0, disp=0)
+        val = kernel_fun(param)
+        print param, val
+        if (val < val_min):
+            val_min = val
+            param_min = param
+    
+    print param_min, val_min
+
+def kernel_fun(param):
+    param = np.abs(param)
+    def kernel(dist):
+        return np.exp(-np.power(dist/param[2], param[0]) - 
+                       np.power(dist/param[3], param[1]))
+    error = 0.0
+    for skynum in range(1, 101):
+        n_halos, halo_coords = read_halos(skynum)
+        gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+        
+        assert(n_halos==1)
+        
+        phi = np.arctan((gal_y - halo_coords[1])/(gal_x - halo_coords[0]))
+        e_tang = -(gal_e1 * np.cos(2. * phi) +
+                   gal_e2 * np.sin(2. * phi))
+        dist = np.sqrt(np.power(gal_x - halo_coords[0], 2) + 
+                       np.power(gal_y - halo_coords[1], 2))
+        weight = kernel(dist)
+        if (np.sum(weight*weight) > 1e-6):
+            alpha = np.sum(weight*e_tang)/np.sum(weight*weight)
+            
+            error += np.sum(np.power(e_tang - alpha*weight, 2))/np.sum(np.power(e_tang,2))
+        else:
+            error += 1000.0
+            
+    print param, error
+    return error
+
+
+
+
+
+
+
+
 
 def finitediff(f, eps):
     """
@@ -57,9 +236,9 @@ def minimize_gdescent(f, x0, fprime, gtol=1e-5, maxiter=10000, alpha=1000.,
         x = x - alpha * g
         if np.linalg.norm(g) < gtol:
             break
-    return x, f(x), fprime(x), i == (maxiter - 1), path
-
-
+        return x, f(x), fprime(x), i == (maxiter - 1), path
+    
+    
 def optimize_sky(sky, **kwargs):
 
     def opt_func(dm_xy):
@@ -70,164 +249,4 @@ def optimize_sky(sky, **kwargs):
     #return minimize_bfgs(opt_func, x0)#, epsilon=1.0)
     return minimize_gdescent(f=opt_func, x0=x0, fprime=grad, **kwargs)
 
-
-'''
-brute force optimization of ellipticity error function...
-'''
-
-
-class OptimizationException(Exception):
-    pass
-
-
-def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
-    nhalo = dm_x.size
-    ngal = gal_x.size
-    
-    # compute weights and angles
-    weights = np.zeros([ngal, nhalo])
-    phis = np.zeros([ngal, nhalo])
-    for ihalo in range(nhalo):
-        weights[:, ihalo] = kernel(np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
-                                           np.power(gal_y - dm_y[ihalo], 2)))
-        phis[:, ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
-        
-    # solve analytically for strengths
-    b = np.zeros(nhalo)
-    A = np.zeros([nhalo, nhalo])
-    for ihalo in range(nhalo):
-        e_tang = -(gal_e1 * np.cos(2. * phis[:, ihalo]) +
-                   gal_e2 * np.sin(2. * phis[:, ihalo]))
-        b[ihalo] = np.sum(weights[:, ihalo] * e_tang)
-        for jhalo in range(nhalo):
-            A[ihalo, jhalo] = np.sum(weights[:, ihalo] * weights[:, jhalo] *
-                                     np.cos(2 * (phis[:, ihalo] - phis[:, jhalo])))
-
-    if np.linalg.cond(A) > 1e9:
-        raise OptimizationException()
-    alpha_star = np.linalg.solve(A, b)
-    #print alpha_star
-    # negative strengths are not allowed
-    #if np.min(alpha_star) <= 0.0:
-    #    raise OptimizationException()
-
-    return -alpha_star * weights * np.cos(2 * phis), -alpha_star * weights * np.sin(2 * phis)
-
-
-def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
-    return np.sum(np.power(gal_e1 - np.sum(model_e1, axis=1), 2) +
-                  np.power(gal_e2 - np.sum(model_e2, axis=1), 2))
-
-def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
-    
-    def f(halo_coords):
-        dm_x = halo_coords[0:nhalo]
-        dm_y = halo_coords[nhalo: 2 * nhalo]
-        try:
-            model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
-                                                  gal_x=gal_x, gal_y=gal_y,
-                                                  gal_e1=gal_e1, gal_e2=gal_e2,
-                                                  kernel=kernel)
-        except OptimizationException:
-            return 1e20
-        
-        # add penalty for leaving domain
-        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2) \
-            - np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0))
-
-    return f
-
-
-def fmin_random(f, nhalo, Ns):
-
-    val_min = 1e20
-    sol_min = None
-    for ii in xrange(Ns):
-        x0 = 4200*np.random.rand(2*nhalo)
-        sol = scipy.optimize.fmin(func=f, x0=x0, disp=0)
-        val = f(sol)
-        if (val < val_min):
-            val_min = val
-            sol_min = sol
-        
-    assert(sol_min != None)
-    
-    return sol_min
-
-
-
-#GRID_SCHEDULE = [100, 20, 7]
-GRID_SCHEDULE = [100, 300, 500]
-
-def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False):
-
-    # halo_coords is stacked coordinates - dm_x first, then dm_y
-    nhalo, halo_coords = skytools.read_halos(skynum, test=test)
-
-    if (Ngrid == None):
-        Ngrid = GRID_SCHEDULE[nhalo-1]
-
-    print Ngrid
-
-    sky = skytools.read_sky(skynum, test=test)
-    gal_x, gal_y, gal_e1, gal_e2 = sky.T
-    
-    f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
-                 gal_e1=gal_e1, gal_e2=gal_e2,
-                 nhalo=nhalo, kernel=kernel)
-    
-    grid_range = [(0, 4200)] * nhalo * 2
-    #sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid) #, finish=None)
-    sol = fmin_random(f=f, nhalo=nhalo, Ns=Ngrid) 
-    val = f(sol)
-    print sol, val 
-    dm_x = sol[0: nhalo]
-    dm_y = sol[nhalo: 2 * nhalo]
-    print dm_x.size, dm_y.size
-    if plot:
-        plot_sky(skynum, dm_x, dm_y, test=test)
-
-    sol_coords = [0.0] * 3 * 2
-    sol_coords[:(nhalo * 2)] = sol
-
-    return sol_coords, val
-
-def diagnostic(skynum, Nrange, kernel=gaussian(1000.)):
-    nhalo, halo_coords = skytools.read_halos(skynum)
-    
-    sky = skytools.read_sky(skynum)
-    gal_x, gal_y, gal_e1, gal_e2 = sky.T
-    
-    f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
-                 gal_e1=gal_e1, gal_e2=gal_e2,
-                 nhalo=nhalo, kernel=kernel)
-    
-    val_data = f(halo_coords)
-    print halo_coords, val_data
-    
-    val_array = np.zeros(len(Nrange))
-    for ii in range(len(Nrange)):
-        sol_coords, val = predict(skynum, Ngrid=Nrange[ii])
-        if (val > 1e5):
-            val = -1.0
-        val_array[ii] = val
-        
-    val_max = np.max(val_array)
-    for ii in range(len(Nrange)):
-        if (val_array[ii] < 0.0):
-            val_array[ii] = val_max
-    
-            
-    plt.plot(Nrange, val_array, linewidth=2.5, color='blue', linestyle='-')
-    plt.hold(True)
-    tmprange = np.linspace(min(Nrange), max(Nrange),100)
-    tmpval = val_data*np.ones(100)
-    plt.plot(tmprange, tmpval, linewidth=2.5, color='red', linestyle='--')
-    
-    plt.title('Training Sky ' + str(skynum) + ': '\
-                  + str(nhalo) + ' halos')
-    plt.xlabel('Ngrid')
-    plt.ylabel('f(xstar)')
-
-    plt.show()
 

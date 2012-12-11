@@ -1,6 +1,27 @@
 import numpy as np
 import scipy.stats
 
+def exppow(d=0.4, bw=6.3):
+    def mykernel(dist):
+        return np.exp(-np.power(dist,d)/bw)
+    return mykernel
+
+def general_exp(param=[0.0, 0.0, 0.0, 0.0]):
+    def mykernel(dist):
+        return np.exp(-np.power(dist/param[2], param[0]) - 
+                       np.power(dist/param[3], param[1]))
+    return mykernel
+
+def expsqrt(bw = 15.414):
+    def mykernel(dist):
+        return np.exp(-np.sqrt(dist)/bw)
+    return mykernel
+
+def invexp(bw = 976.884):
+    def mykernel(dist):
+        return np.exp(-dist/bw)
+    return mykernel
+
 def distpow(exp = -1.):
     def mykernel(dist):
         return np.power(dist, exp)
