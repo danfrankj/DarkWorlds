@@ -9,9 +9,6 @@ from now on, all dark matter coordinates are stored [x1,x2,x3,y1,y2,y3]
 they are only converted from/to [x1,y1,x2,y2,x3,y3] when doing I/O
 '''
 
-class OptimizationException(Exception):
-    pass
-
 def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
     nhalo = dm_x.size
     ngal = gal_x.size
@@ -36,14 +33,15 @@ def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
                                      np.cos(2 * (phis[:, ihalo] - phis[:, jhalo])))
 
     if np.linalg.cond(A) > 1e9:
-        raise OptimizationException()
+        return np.zeros(gal_e1.shape), np.zeros(gal_e2.shape)
     alpha_star = np.linalg.solve(A, b)
     
     # negative strengths are not allowed
-    if np.min(alpha_star) <= 0.0:
-        raise OptimizationException()
+    #if np.min(alpha_star) <= 0.0:
+    #    raise OptimizationException()
     # eventually we'd like a model where strengths greater than one are not allowed...
     alpha_star = np.minimum(alpha_star, 1.0)
+    alpha_star = np.maximum(alpha_star, 0.0)
     
     return -np.sum(alpha_star * weights * np.cos(2 * phis), axis=1), -np.sum(alpha_star * weights * np.sin(2 * phis), axis=1)
 
@@ -57,17 +55,16 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
     def f(halo_coords):
         dm_x = halo_coords[0:nhalo]
         dm_y = halo_coords[nhalo: 2 * nhalo]
-        try:
-            model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
-                                                  gal_x=gal_x, gal_y=gal_y,
-                                                  gal_e1=gal_e1, gal_e2=gal_e2,
-                                                  kernel=kernel)
-        except OptimizationException:
-            return 1e20
+        
+        model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
+                                              gal_x=gal_x, gal_y=gal_y,
+                                              gal_e1=gal_e1, gal_e2=gal_e2,
+                                              kernel=kernel)
         
         # add penalty for leaving domain (prevents simplex algo from wandering...)
-        penalty = 10.*(-np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0)))
-        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2) + penalty
+        penalty = 1.*(-np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0)))
+        denom = elipticity_error(gal_e1, gal_e2, np.zeros(gal_e1.shape), np.zeros(gal_e2.shape)) 
+        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2)/denom + penalty
 
     return f
 
@@ -89,7 +86,7 @@ def fmin_random(f, nhalo, Ns):
     
     return sol_min
 
-GRID_SCHEDULE = [100, 200, 300]
+GRID_SCHEDULE = [20, 50, 100]
 
 def predict(skynum, kernel=gaussian(1000.), Ngrid=None, plot=False, test=False, verbose=True):
 
@@ -138,14 +135,14 @@ def optimizeparam(Ns=100):
         x0[1] = 100.0*np.random.rand()
         #x0[3] = 100.0*np.random.rand()
         
-        param = scipy.optimize.fmin(func=kernel_fun, x0=x0, disp=0)
+        param = scipy.optimize.fmin(func=kernel_fun2, x0=x0, disp=0)
         val = kernel_fun(param)
         print param, val
         if (val < val_min):
             val_min = val
             param_min = param
     
-    print param_min, val_min
+    print "HEREHERE: ", param_min, val_min
 
 def kernel_fun(param):
     param = np.abs(param)
@@ -172,6 +169,24 @@ def kernel_fun(param):
         else:
             error += 1000.0
 
+    return error
+
+def kernel_fun2(param):
+    param = np.abs(param)
+    def kernel(dist):
+        return np.exp(-np.power(dist/param[1], param[0]))
+    error = 0.0
+    for skynum in range(1, 301):
+        nhalo, halo_coords = read_halos(skynum)
+        gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+        
+        f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
+                 gal_e1=gal_e1, gal_e2=gal_e2,
+                 nhalo=nhalo, kernel=kernel)
+        
+        error += f(halo_coords)
+        
+    print param, error
     return error
 
 

@@ -142,11 +142,11 @@ def diagnostic(skynum, Nrange, kernel=exppow()):
 
     plt.show()
 
-def plot_polar(kernel=exppow()):
+def plot_pdf(kernel=exppow_lim()):
     
     all_data = []
         
-    for skynum in range(1, 101):
+    for skynum in range(1, 301):
         nhalo, halo_coords = read_halos(skynum)
         gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
         print skynum, halo_coords
@@ -157,43 +157,37 @@ def plot_polar(kernel=exppow()):
                                                     gal_x=gal_x, gal_y=gal_y,
                                                     gal_e1=gal_e1, gal_e2=gal_e2,
                                                     kernel=kernel)
-        model_e1 = model_e1.T
-        model_e2 = model_e2.T
-        assert(nhalo==1)
-        '''
-        phi = np.arctan((gal_y - halo_coords[1])/(gal_x - halo_coords[0]))
-        e_tang = -(gal_e1 * np.cos(2. * phi) +
-                   gal_e2 * np.sin(2. * phi))
-        dist = np.sqrt(np.power(gal_x - halo_coords[0], 2) + 
-                   np.power(gal_y - halo_coords[1], 2))
-        weight = kernel(dist)
-        alpha = np.sum(weight*e_tang)/np.sum(weight*weight)
         
-        model_e1 = -alpha*weight*np.cos(2.0*phi)
-        model_e2 = -alpha*weight*np.sin(2.0*phi)
-        '''
         model_emag = np.sqrt(model_e1*model_e1 + model_e2*model_e2)
-        # limit predicted ellipticity to emag = 1
-        coeff_emag = np.maximum(model_emag, 1.0)
-        model_e1 /= coeff_emag
-        model_e2 /= coeff_emag
-        model_emag = np.sqrt(model_e1*model_e1 + model_e2*model_e2)
-        assert(max(model_emag) <= (1.0 + 1e-10))
-        
+        assert(np.max(model_emag) <= 1.0) # if this happens should be treated seperately...
+                
         gal_emag = np.sqrt(gal_e1*gal_e1 + gal_e2*gal_e2)
         theta = np.arccos((gal_e1*model_e1 + gal_e2*model_e2)/gal_emag/model_emag)
+
+        gal_model_e1 = gal_e1*model_e1 + gal_e2*model_e2
+        gal_model_e2 = gal_e1*model_e2 - gal_e2*model_e1
         
-        all_data.append(np.array([model_emag,theta,gal_emag]).T)
+        all_data.append(np.array([model_emag, gal_model_e1, gal_model_e2]).T)
     
     # convert list into monster array
     all_data = np.vstack(all_data)
+    
     # sort based on pred_emag
     all_data = all_data[all_data[:,0].argsort()]
+    ind = np.where((all_data[:,0] > 0.3) & (all_data[:,0] < 0.4))
+                   #for igal in range(all_data.shape[0]):
+                       #if ((all_data[igal,0] > 0.1) & (all_data[igal,0] < 0.2)):
+    plt.scatter(all_data[ind,1], all_data[ind,2], s=2)
+    plt.axis([-1.0, 1.0, -1.0, 1.0])
+    plt.show()
+    return
+    
     
     # place data into pred_emag bins
     Nbins = 10
-    emag_bins = np.power(np.linspace(0.0,1.0,Nbins+1),2.0);
+    emag_bins = np.power(np.linspace(0.0,np.max(all_data[:,0]),Nbins+1),2.0);
     ind = np.zeros(Nbins+1)
+    
     print emag_bins
     for ii in range(Nbins-1):
         ind[ii+1] = np.min(np.where(all_data[:,0] > emag_bins[ii+1]))
@@ -205,10 +199,10 @@ def plot_polar(kernel=exppow()):
     
     ax = plt.subplot(111, polar=True)
     
-    i0 = 4
-    i1 = 5
+    i0 = 7
+    i1 = 8
     
-    plt.scatter(-all_data[ind[i0]:ind[i1], 1], all_data[ind[i0]:ind[i1], 2], s=5)
+    plt.scatter(-all_data[ind[i0]:ind[i1], 1], all_data[ind[i0]:ind[i1], 2], s=1)
     plt.scatter([0.0,0.0], [all_data[ind[i0],0], all_data[ind[i1],0]], s=10, color='red')
     plt.show()
 
