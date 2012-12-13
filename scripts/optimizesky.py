@@ -10,7 +10,7 @@ from now on, all dark matter coordinates are stored [x1,x2,x3,y1,y2,y3]
 they are only converted from/to [x1,y1,x2,y2,x3,y3] when doing I/O
 '''
 
-def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
+def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
     nhalo = dm_x.size
     ngal = gal_x.size
     
@@ -18,8 +18,11 @@ def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
     weights = np.zeros([ngal, nhalo])
     phis = np.zeros([ngal, nhalo])
     for ihalo in range(nhalo):
-        weights[:, ihalo] = kernel(np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
-                                           np.power(gal_y - dm_y[ihalo], 2)))
+        dist = np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
+                       np.power(gal_y - dm_y[ihalo], 2))
+        if (width != None):
+            dist = np.maximum(dist, width[ihalo])
+        weights[:, ihalo] = kernel(dist)
         phis[:, ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
         
     # solve analytically for strengths
@@ -32,7 +35,7 @@ def model_elipticity(dm_x, dm_y, gal_x, gal_y, gal_e1, gal_e2, kernel):
         for jhalo in range(nhalo):
             A[ihalo, jhalo] = np.sum(weights[:, ihalo] * weights[:, jhalo] *
                                      np.cos(2 * (phis[:, ihalo] - phis[:, jhalo])))
-
+    
     if np.linalg.cond(A) > 1e6:
         return 1e-9*np.ones(gal_e1.shape), 1e-9*np.ones(gal_e2.shape)
     alpha_star = np.linalg.solve(A, b)
@@ -55,13 +58,17 @@ def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
     return np.sum(np.power(gal_e1 - model_e1, 2) +
                   np.power(gal_e2 - model_e2, 2))/denom
 
-def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
+def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel, has_width=False):
     
     def f(halo_coords):
         dm_x = halo_coords[0:nhalo]
         dm_y = halo_coords[nhalo: 2 * nhalo]
+        if (has_width):
+            width = halo_coords[2 * nhalo: 3 * nhalo]
+        else:
+            width = None
         
-        model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
+        model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y, width=width,
                                               gal_x=gal_x, gal_y=gal_y,
                                               gal_e1=gal_e1, gal_e2=gal_e2,
                                               kernel=kernel)
@@ -74,13 +81,19 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
 
     return f
 
-def fmin_random(f, nhalo, Ns):
+def fmin_random(f, nhalo, Ns, has_width=False):
 
     val_min = 1e30
     sol_min = None
     for ii in xrange(Ns):
         # produce a random halo configuration in the domain
-        x0 = 4200*np.random.rand(2*nhalo)
+        if (has_width):
+            x0 = np.random.rand(3*nhalo)
+            x0[:2*nhalo] *= 4200.0
+            x0[2*nhalo:3*nhalo] *= 200.0
+        else:
+            x0 = 4200.*np.random.rand(2*nhalo)
+                    
         # hand over to native simplex algorithm
         sol = scipy.optimize.fmin(func=f, x0=x0, disp=0)
         
@@ -95,44 +108,7 @@ def fmin_random(f, nhalo, Ns):
 
 GRID_SCHEDULE = [100, 200, 300]
 
-def build_pdf(kernel):
-    # build kernel density estimate from training data...
-    samples = []
-        
-    for skynum in range(1, 101):
-        nhalo, halo_coords = read_halos(skynum)
-        gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
-        print skynum, halo_coords
-        dm_x = halo_coords[0:nhalo]
-        dm_y = halo_coords[nhalo: 2 * nhalo]
-        
-        model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
-                                              gal_x=gal_x, gal_y=gal_y,
-                                              gal_e1=gal_e1, gal_e2=gal_e2,
-                                              kernel=kernel)
-        
-        model_emag = np.sqrt(model_e1*model_e1 + model_e2*model_e2)
-        assert(np.max(model_emag) <= 1.0) # if this happens should be treated seperately...
-                
-        gal_emag = np.sqrt(gal_e1*gal_e1 + gal_e2*gal_e2)
-        theta = np.arccos((gal_e1*model_e1 + gal_e2*model_e2)/gal_emag/model_emag)
-
-        gal_model_e1 = (gal_e1*model_e1 + gal_e2*model_e2)/model_emag
-        gal_model_e2 = (gal_e1*model_e2 - gal_e2*model_e1)/model_emag
-        
-        samples.append(np.array([model_emag, gal_model_e1, gal_model_e2]).T)
-        
-        # reflected version is the same...
-        #gal_model_e2 = -(gal_e1*model_e2 - gal_e2*model_e1)/model_emag
-        #samples.append(np.array([model_emag, gal_model_e1, gal_model_e2]).T)
-
-    # convert list into monster array
-    samples = np.vstack(samples)
-    my_pdf = scipy.stats.gaussian_kde(samples.T)
-
-    return my_pdf
-
-def predict(skynum, kernel=exppow_lim(), Ngrid=None, plot=False, test=False, verbose=True):
+def predict(skynum, kernel=exppow(), Ngrid=None, plot=False, test=False, verbose=True, has_width=False):
 
     nhalo, halo_coords = read_halos(skynum, test=test)
     
@@ -147,13 +123,13 @@ def predict(skynum, kernel=exppow_lim(), Ngrid=None, plot=False, test=False, ver
     
     f = fwrapper(gal_x=gal_x, gal_y=gal_y, 
                  gal_e1=gal_e1, gal_e2=gal_e2,
-                 nhalo=nhalo, kernel=kernel)
+                 nhalo=nhalo, kernel=kernel, has_width=has_width)
     
     # brute is deprecated in favor of simplex w/random starts...
     #grid_range = [(0, 4200)] * nhalo * 2
     #sol = scipy.optimize.brute(f, grid_range, Ns=Ngrid) #, finish=None)
     
-    sol = fmin_random(f=f, nhalo=nhalo, Ns=Ngrid) 
+    sol = fmin_random(f=f, nhalo=nhalo, Ns=Ngrid, has_width=has_width) 
     val = f(sol)
     
     print sol, val 
@@ -194,7 +170,7 @@ def kernel_fun2(param):
     def kernel(dist):
         return np.exp(-np.power(np.maximum(dist,param[2])/param[1], param[0]))
     error = 0.0
-    for skynum in range(1, 101):
+    for skynum in range(50, 101):
         nhalo, halo_coords = read_halos(skynum)
         gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
         
@@ -238,6 +214,43 @@ def kernel_fun(param):
     
     print param, error
     return error
+
+def build_pdf(kernel):
+    # build kernel density estimate from training data...
+    samples = []
+        
+    for skynum in range(1, 301):
+        nhalo, halo_coords = read_halos(skynum)
+        gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+        print skynum, halo_coords
+        dm_x = halo_coords[0:nhalo]
+        dm_y = halo_coords[nhalo: 2 * nhalo]
+        
+        model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
+                                              gal_x=gal_x, gal_y=gal_y,
+                                              gal_e1=gal_e1, gal_e2=gal_e2,
+                                              kernel=kernel)
+        
+        model_emag = np.sqrt(model_e1*model_e1 + model_e2*model_e2)
+        assert(np.max(model_emag) <= 1.0) # if this happens should be treated seperately...
+                
+        gal_emag = np.sqrt(gal_e1*gal_e1 + gal_e2*gal_e2)
+        theta = np.arccos((gal_e1*model_e1 + gal_e2*model_e2)/gal_emag/model_emag)
+
+        gal_model_e1 = (gal_e1*model_e1 + gal_e2*model_e2)/model_emag
+        gal_model_e2 = (gal_e1*model_e2 - gal_e2*model_e1)/model_emag
+        
+        samples.append(np.array([model_emag, gal_model_e1, gal_model_e2]).T)
+        
+        # reflected version is the same...
+        #gal_model_e2 = -(gal_e1*model_e2 - gal_e2*model_e1)/model_emag
+        #samples.append(np.array([model_emag, gal_model_e1, gal_model_e2]).T)
+
+    # convert list into monster array
+    samples = np.vstack(samples)
+    my_pdf = scipy.stats.gaussian_kde(samples.T)
+
+    return my_pdf
 
 
 

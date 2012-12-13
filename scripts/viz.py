@@ -207,6 +207,7 @@ def diagnostic(Nrange, kernel=exppow()):
         plt.ylabel(r'$\mathrm{normalized \ objective \ value}$')
       
     plt.plot(Nrange, np.zeros(len(Nrange)), linewidth=2.0, color='blue', linestyle='--')
+    plt.axis('tight')
     plt.show()
 
 def plot_likelihood(skynum, pdf=None, kernel=exppow_lim(), N=20):
@@ -252,17 +253,19 @@ def plot_pdf(kernel=exppow_lim(), N=10):
         
     X, Y = np.meshgrid(np.linspace(-1.0,1.0,N), np.linspace(-1.0,1.0,N))
     
-    for model_emag in np.linspace(0.0,0.5,11):
+    for model_emag in np.linspace(0.0,0.5,6):
         Z = my_pdf(np.array([model_emag*np.ones(X.size), X.ravel(), Y.ravel()]))
         Z = Z.reshape(X.shape)
         plt.figure()
         plt.pcolor(X, Y, Z)
         plt.colorbar()
         plt.hold(True)
-        plt.scatter(model_emag, 0.0, s=10, color='white')
+        plt.scatter(model_emag, 0.0, s=15, color='white')
         plt.axis([-1.0,1.0,-1.0,1.0])
-        plt.title("model_emag " + str(model_emag))
-
+        #plt.title("model_emag " + str(model_emag))
+        plt.xlabel(r'$\tilde{e}_1$',fontsize=18)
+        plt.ylabel(r'$\tilde{e}_2$',fontsize=18)
+        
     plt.show()
     
     
