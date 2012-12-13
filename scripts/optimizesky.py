@@ -21,7 +21,7 @@ def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
         dist = np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
                        np.power(gal_y - dm_y[ihalo], 2))
         if (width != None):
-            dist = np.maximum(dist, width[ihalo])
+            dist = np.maximum(dist, np.abs(width[ihalo]))
         weights[:, ihalo] = kernel(dist)
         phis[:, ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
         
@@ -47,7 +47,7 @@ def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
     if (np.min(alpha_star) < 0.0):
         return 1e-9*np.ones(gal_e1.shape), 1e-9*np.ones(gal_e2.shape)
     
-    alpha_star = np.minimum(alpha_star, 1.0)
+    #alpha_star = np.minimum(alpha_star, 1.0)
         
     return -np.sum(alpha_star * weights * np.cos(2 * phis), axis=1), -np.sum(alpha_star * weights * np.sin(2 * phis), axis=1)
 
@@ -75,9 +75,18 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel, has_width=False):
         
         # add penalty for leaving domain (prevents simplex algo from wandering...)
         penalty = 10.*(-np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0)))
-        error = elipticity_error(gal_e1, gal_e2, model_e1, model_e2)
+        # also add penalty for halos that are too close
         
-        return error + penalty
+        min_dist = 1e10
+        for ii in range(nhalo):
+            for jj in range(nhalo):
+                if (ii != jj):
+                    min_dist = np.minimum(min_dist, np.sqrt(np.power(dm_x[ii]-dm_x[jj], 2.0) + 
+                                                            np.power(dm_y[ii]-dm_y[jj], 2.0)))
+        penalty = 0.0
+        penalty += 100.*np.maximum(200.0 - min_dist, 0.0)
+        
+        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2) + penalty
 
     return f
 
@@ -215,10 +224,10 @@ def kernel_fun(param):
     print param, error
     return error
 
-def build_pdf(kernel):
+def build_pdf(): #kernel):
     # build kernel density estimate from training data...
     samples = []
-        
+    min_dist = 1e20
     for skynum in range(1, 301):
         nhalo, halo_coords = read_halos(skynum)
         gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
@@ -226,6 +235,12 @@ def build_pdf(kernel):
         dm_x = halo_coords[0:nhalo]
         dm_y = halo_coords[nhalo: 2 * nhalo]
         
+        for ii in range(nhalo):
+            for jj in range(nhalo):
+                if (ii != jj):
+                    min_dist = np.minimum(min_dist, np.sqrt(np.power(dm_x[ii]-dm_x[jj], 2.0) + 
+                                                            np.power(dm_y[ii]-dm_y[jj], 2.0)))
+        '''
         model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y,
                                               gal_x=gal_x, gal_y=gal_y,
                                               gal_e1=gal_e1, gal_e2=gal_e2,
@@ -245,13 +260,14 @@ def build_pdf(kernel):
         # reflected version is the same...
         #gal_model_e2 = -(gal_e1*model_e2 - gal_e2*model_e1)/model_emag
         #samples.append(np.array([model_emag, gal_model_e1, gal_model_e2]).T)
-
+    
     # convert list into monster array
     samples = np.vstack(samples)
     my_pdf = scipy.stats.gaussian_kde(samples.T)
 
     return my_pdf
-
+    '''
+    print min_dist
 
 
 

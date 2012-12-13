@@ -5,7 +5,7 @@ from haloness import *
 TEST_SKIES = range(1, 121)
 TRAIN_SKIES = range(1,301)
 
-def create_submission(test=True, kernel=exppow()): 
+def create_submission(test=True, kernel=exppow(), has_width=True): 
     if (test):
         SKY_LIST = TEST_SKIES
     else:
@@ -14,7 +14,7 @@ def create_submission(test=True, kernel=exppow()):
     with file('submission' + timestamp.replace(' ', '_').replace(':', '.') + '.csv', 'w') as out:
         for skynum in SKY_LIST:
             print "working on Sky" + str(skynum) + "..."
-            dm_x, dm_y, val = optimizesky.predict(skynum, test=test, kernel=kernel, has_width=true)
+            dm_x, dm_y, val = optimizesky.predict(skynum, test=test, kernel=kernel, has_width=has_width)
             # convert from dm_x, dm_y to [x1,y1,x2,y2,...]
             halo_coords = [0.0] * 3 * 2
             for idm in range(dm_x.size):
