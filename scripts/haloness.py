@@ -12,6 +12,12 @@ def exppow_lim(d=0.574, bw=392.):
         return np.exp(-np.power(dist/bw,d))
     return mykernel
 
+def gen_exp(param=np.array([0.58705303, 403.42452533, 169.63767383])):
+    def mykernel(dist):
+        return np.exp(-np.power(np.maximum(dist,param[2])/param[1], param[0]))
+    return mykernel
+# limited; [   0.58705303  403.42452533  169.63767383] 92.8323279807
+
 def expsqrt(bw = 15.414):
     def mykernel(dist):
         return np.exp(-np.sqrt(dist)/bw)
@@ -27,9 +33,9 @@ def distpow(exp = -1.):
         return np.power(dist, exp)
     return mykernel
 
-def gaussian(bw=1000.):
+def gaussian(bw=1622.):
     def mykernel(dist):
-        return scipy.stats.norm.pdf(dist, loc=0, scale=bw)
+        return np.exp(-np.power(dist/bw,2.0))
     return mykernel
 
 def haloness(dm_x, dm_y, sky, kernel):
