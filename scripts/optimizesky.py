@@ -36,7 +36,7 @@ def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
             A[ihalo, jhalo] = np.sum(weights[:, ihalo] * weights[:, jhalo] *
                                      np.cos(2 * (phis[:, ihalo] - phis[:, jhalo])))
     
-    if np.linalg.cond(A) > 1e6:
+    if ((np.linalg.cond(A) > 1e6) | np.isnan(np.linalg.cond(A)) == True):
         return 1e-9*np.ones(gal_e1.shape), 1e-9*np.ones(gal_e2.shape)
     alpha_star = np.linalg.solve(A, b)
     
@@ -47,7 +47,11 @@ def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
     if (np.min(alpha_star) < 0.0):
         return 1e-9*np.ones(gal_e1.shape), 1e-9*np.ones(gal_e2.shape)
     
-    #alpha_star = np.minimum(alpha_star, 1.0)
+    if (width != None):
+        alpha_star = np.minimum(alpha_star, 1.0/kernel(np.abs(width)))
+        #assert(np.max(alpha_star*kernel(np.abs(width))) < 1.01)
+    else:
+        alpha_star = np.minimum(alpha_star, 1.0)
         
     return -np.sum(alpha_star * weights * np.cos(2 * phis), axis=1), -np.sum(alpha_star * weights * np.sin(2 * phis), axis=1)
 
@@ -152,20 +156,19 @@ def predict(skynum, kernel=exppow(), Ngrid=None, plot=False, test=False, verbose
 
 def optimizeparam(Ns=100):
     
-    Nparam = 3
+    Nparam = 2
     val_min = 1e30
     param_min = None
     for ii in xrange(Ns):
         x0 = np.random.rand(Nparam)
         # exponents are (0.0,2.0)
-        x0[0] = 2.0*np.random.rand()
+        x0[0] = 0.4 #2.0*np.random.rand()
         #x0[1] = 2.0*np.random.rand()
         # coefficients are anyone's guess...
-        x0[1] = 100.0*np.random.rand()
-        x0[2] = 1000.0*np.random.rand()
-        
-        param = scipy.optimize.fmin(func=kernel_fun2, x0=x0, disp=0)
-        val = kernel_fun(param)
+        x0[1] = 100.0 #100.0*np.random.rand()
+                
+        param = scipy.optimize.fmin(func=kernel_fun3, x0=x0, disp=0)
+        val = kernel_fun3(param)
         print param, val
         if (val < val_min):
             val_min = val
@@ -173,6 +176,55 @@ def optimizeparam(Ns=100):
     
     print "HEREHERE: ", param_min, val_min
 
+def kernel_fun3(param):
+    param = np.abs(param)
+    def kernel(dist):
+        return np.exp(-np.power(dist/param[1], param[0]))
+    error = 0.0
+    for skynum in range(1, 101):
+        
+        nhalo, halo_coords = read_halos(skynum)
+        gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+        
+        f = fwidth(halo_coords=halo_coords,gal_x=gal_x, gal_y=gal_y, 
+                   gal_e1=gal_e1, gal_e2=gal_e2,
+                   nhalo=nhalo, kernel=kernel)
+        
+        val_min = 1e30
+        width_min = None
+        for ii in xrange(100):
+            x0 = 600.0*np.random.rand()
+            
+            # hand over to native simplex algorithm
+            width = scipy.optimize.fmin(func=f, x0=x0, disp=0)
+            
+            val = f(width)
+            if (val < val_min):
+                val_min = val
+                width_min = width
+                
+                #print width_min
+        error += f(width_min)
+        
+    print "param, error: ", param, error
+    return error
+
+def fwidth(halo_coords, gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
+    
+    dm_x = halo_coords[0:nhalo]
+    dm_y = halo_coords[nhalo: 2 * nhalo]
+    
+    def f(width):
+                
+        model_e1, model_e2 = model_elipticity(dm_x=dm_x, dm_y=dm_y, width=width,
+                                              gal_x=gal_x, gal_y=gal_y,
+                                              gal_e1=gal_e1, gal_e2=gal_e2,
+                                              kernel=kernel)
+        
+        return elipticity_error(gal_e1, gal_e2, model_e1, model_e2)
+
+    return f
+    
 def kernel_fun2(param):
     param[0] = np.abs(param[0])
     param[2] = np.abs(param[2])
