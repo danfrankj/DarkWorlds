@@ -6,6 +6,11 @@ def exppow(d=0.4, bw=100.0):
         return np.exp(-np.power(dist/bw,d))
     return mykernel
 
+def exppow2(d=0.3875, bw=44.8):
+    def mykernel(dist):
+        return np.exp(-np.power(dist/bw,d))
+    return mykernel
+
 def exppow_lim(d=0.574, bw=392.):
     # old values: d=0.585, bw=409.0
     def mykernel(dist):

@@ -302,10 +302,11 @@ def plot_etang_train(kernel=gaussian(1000.)):
     plt.show()
     
 
-def plot_haloness(skynum, kernel=gaussian(1000.), N=200.):
-    mysky = read_sky(skynum)
-    gal_x,gal_y,gal_e1,gal_e2 = mysky.T
+def plot_haloness(skynum, kernel=exppow(), N=20.):
     
+    gal_x,gal_y,gal_e1,gal_e2 = read_sky(skynum).T
+    nhalo, halo_coords = read_halos(skynum)
+
     margin = 100
     xplot = np.linspace(min(gal_x)-margin, max(gal_x)+margin, N)
     yplot = np.linspace(min(gal_y)-margin, max(gal_y)+margin, N)
@@ -313,22 +314,26 @@ def plot_haloness(skynum, kernel=gaussian(1000.), N=200.):
     X,Y = np.meshgrid(xplot,yplot)
     Z = np.zeros(X.shape)
     
-    # looping is NOT the right thing to do...
+    f = optsky.fwrapper(gal_x=gal_x, gal_y=gal_y, gal_e1=gal_e1, gal_e2=gal_e2, 
+                        nhalo=nhalo, kernel=kernel, has_width=False)
+    
     for idx, x in enumerate(xplot):
         for idy, y in enumerate(yplot):
-            Z[idy, idx] = haloness(x, y, mysky, kernel)
+            coords = np.array([x,y])
+            Z[idy, idx] = f(coords)
     
     #plt.contourf(X, Y, Z)
     plt.pcolor(X, Y, Z)
     plt.colorbar()
     plt.hold(True)
     
-    nhalo, halo_coords = read_halos(skynum)
+    
     for ihalo in range(nhalo):
         plt.scatter(halo_coords[ihalo*2], halo_coords[ihalo*2 + 1],\
                         color='white', s=50)
         
     plt.axis((min(gal_x)-margin, max(gal_x)+margin, min(gal_y)-margin, max(gal_y)+margin))
+    plt.title("Objective function value for Sky " + str(skynum))
     
     plt.show()
 
