@@ -13,6 +13,9 @@ they are only converted from/to [x1,y1,x2,y2,x3,y3] when doing I/O
 def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
     nhalo = dm_x.size
     ngal = gal_x.size
+
+    if (width != None):
+        width = np.minimum(np.abs(width), 800.0)
     
     # compute kernel weights and angles
     weights = np.zeros([ngal, nhalo])
@@ -21,7 +24,7 @@ def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
         dist = np.sqrt(np.power(gal_x - dm_x[ihalo], 2) +
                        np.power(gal_y - dm_y[ihalo], 2))
         if (width != None):
-            dist = np.maximum(dist, np.abs(width[ihalo]))
+            dist = np.maximum(dist, width[ihalo])
         weights[:, ihalo] = kernel(dist)
         phis[:, ihalo] = np.arctan((gal_y - dm_y[ihalo]) / (gal_x - dm_x[ihalo]))
         
@@ -48,7 +51,7 @@ def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
         return 1e-9*np.ones(gal_e1.shape), 1e-9*np.ones(gal_e2.shape)
     
     if (width != None):
-        alpha_star = np.minimum(alpha_star, 1.0/kernel(np.abs(width)))
+        alpha_star = np.minimum(alpha_star, 1.0/kernel(width))
         #assert(np.max(alpha_star*kernel(np.abs(width))) < 1.01)
     else:
         alpha_star = np.minimum(alpha_star, 1.0)
@@ -78,7 +81,7 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel, has_width=False):
                                               kernel=kernel)
         
         # add penalty for leaving domain (prevents simplex algo from wandering...)
-        penalty = 10.*(-np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0)))
+        penalty = 100.*(-np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0)))
         # also add penalty for halos that are too close
         
         min_dist = 1e10
@@ -87,7 +90,7 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel, has_width=False):
                 if (ii != jj):
                     min_dist = np.minimum(min_dist, np.sqrt(np.power(dm_x[ii]-dm_x[jj], 2.0) + 
                                                             np.power(dm_y[ii]-dm_y[jj], 2.0)))
-        penalty = 0.0
+                    
         penalty += 100.*np.maximum(200.0 - min_dist, 0.0)
         
         return elipticity_error(gal_e1, gal_e2, model_e1, model_e2) + penalty
@@ -119,7 +122,7 @@ def fmin_random(f, nhalo, Ns, has_width=False):
     
     return sol_min
 
-GRID_SCHEDULE = [100, 200, 300]
+GRID_SCHEDULE = [200, 500, 700]
 
 def predict(skynum, kernel=exppow(), Ngrid=None, plot=False, test=False, verbose=True, has_width=False):
 
