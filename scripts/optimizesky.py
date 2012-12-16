@@ -63,7 +63,7 @@ def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
     emag = np.sqrt(np.power(model_e1, 2) +
                    np.power(model_e2, 2))
 
-    ind = np.where(emag > 0.01)
+    ind = np.where(emag > 0.001)
     if (ind[0].size > 0):
         gal_e1 = gal_e1[ind]
         gal_e2 = gal_e2[ind]
@@ -93,8 +93,7 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel, has_width=False):
         
         # add penalty for leaving domain (prevents simplex algo from wandering...)
         penalty = 100.*(-np.sum(np.minimum(halo_coords,0)) + np.sum(np.maximum(halo_coords-4200,0)))
-        # also add penalty for halos that are too close
-        
+        # also add penalty for halos that are too close        
         min_dist = 1e10
         for ii in range(nhalo):
             for jj in range(nhalo):
@@ -102,7 +101,7 @@ def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel, has_width=False):
                     min_dist = np.minimum(min_dist, np.sqrt(np.power(dm_x[ii]-dm_x[jj], 2.0) + 
                                                             np.power(dm_y[ii]-dm_y[jj], 2.0)))
                     
-        penalty += 100.*np.maximum(200.0 - min_dist, 0.0)
+        penalty += 100.*np.maximum(150.0 - min_dist, 0.0)
         
         return elipticity_error(gal_e1, gal_e2, model_e1, model_e2) + penalty
 
@@ -170,7 +169,7 @@ def predict(skynum, kernel=exppow(), Ngrid=None, plot=False, test=False, verbose
 
 def optimizeparam(Ns=100):
     
-    Nparam = 2
+    Nparam = 3
     val_min = 1e30
     param_min = None
     for ii in xrange(Ns):
@@ -180,9 +179,10 @@ def optimizeparam(Ns=100):
         #x0[1] = 2.0*np.random.rand()
         # coefficients are anyone's guess...
         x0[1] = 100.0*np.random.rand()
+        x0[2] = 100.0*np.random.rand()
                 
-        param = scipy.optimize.fmin(func=kernel_fun3, x0=x0, disp=0)
-        val = kernel_fun3(param)
+        param = scipy.optimize.fmin(func=kernel_fun2, x0=x0, disp=0)
+        val = kernel_fun2(param)
         print param, val
         if (val < val_min):
             val_min = val
@@ -240,8 +240,7 @@ def fwidth(halo_coords, gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel):
     return f
     
 def kernel_fun2(param):
-    param[0] = np.abs(param[0])
-    param[2] = np.abs(param[2])
+    param = np.abs(param)
     def kernel(dist):
         return np.exp(-np.power(np.maximum(dist,param[2])/param[1], param[0]))
     error = 0.0
