@@ -2,10 +2,10 @@ import optimizesky
 import datetime
 from haloness import *
 
-TEST_SKIES = range(1, 121)
-TRAIN_SKIES = range(1,301)
+TEST_SKIES = range(100, 121)
+TRAIN_SKIES = range(280, 301)
 
-def create_submission(test=True, kernel=exppow2(), has_width=True): 
+def create_submission(test=True, kernel=gen_exp(), has_width=False): 
     if (test):
         SKY_LIST = TEST_SKIES
     else:

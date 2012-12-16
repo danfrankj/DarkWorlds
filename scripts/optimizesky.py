@@ -60,10 +60,21 @@ def model_elipticity(dm_x, dm_y, width, gal_x, gal_y, gal_e1, gal_e2, kernel):
 
 
 def elipticity_error(gal_e1, gal_e2, model_e1, model_e2):
-    denom = np.sum(np.power(gal_e1 - np.zeros(gal_e1.shape), 2) +
-                   np.power(gal_e2 - np.zeros(gal_e2.shape), 2))
-    return np.sum(np.power(gal_e1 - model_e1, 2) +
-                  np.power(gal_e2 - model_e2, 2))/denom
+    emag = np.sqrt(np.power(model_e1, 2) +
+                   np.power(model_e2, 2))
+
+    ind = np.where(emag > 0.01)
+    if (ind[0].size > 0):
+        gal_e1 = gal_e1[ind]
+        gal_e2 = gal_e2[ind]
+        model_e1 = model_e1[ind]
+        model_e2 = model_e2[ind]
+        denom = np.sum(np.power(gal_e1 - np.zeros(gal_e1.shape), 2) +
+                       np.power(gal_e2 - np.zeros(gal_e2.shape), 2))
+        return np.sum(np.power(gal_e1 - model_e1, 2) +
+                      np.power(gal_e2 - model_e2, 2))/denom
+    else:
+        return 1.0
 
 def fwrapper(gal_x, gal_y, gal_e1, gal_e2, nhalo, kernel, has_width=False):
     
@@ -122,7 +133,7 @@ def fmin_random(f, nhalo, Ns, has_width=False):
     
     return sol_min
 
-GRID_SCHEDULE = [200, 500, 700]
+GRID_SCHEDULE = [200, 400, 800]
 
 def predict(skynum, kernel=exppow(), Ngrid=None, plot=False, test=False, verbose=True, has_width=False):
 
@@ -165,10 +176,10 @@ def optimizeparam(Ns=100):
     for ii in xrange(Ns):
         x0 = np.random.rand(Nparam)
         # exponents are (0.0,2.0)
-        x0[0] = 0.4 #2.0*np.random.rand()
+        x0[0] = 2.0*np.random.rand()
         #x0[1] = 2.0*np.random.rand()
         # coefficients are anyone's guess...
-        x0[1] = 100.0 #100.0*np.random.rand()
+        x0[1] = 100.0*np.random.rand()
                 
         param = scipy.optimize.fmin(func=kernel_fun3, x0=x0, disp=0)
         val = kernel_fun3(param)
